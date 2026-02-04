@@ -1,28 +1,25 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  LayoutGrid, FolderMusic, Radio, Signal, 
-  Cpu, Zap, ShieldCheck, ChevronRight, Activity, Library
+  LayoutGrid, Library, Radio, Signal, 
+  Cpu, Zap, ShieldCheck, ChevronRight, Activity
 } from 'lucide-react';
 
 interface SidebarProps {
-  activeTab: 'home' | 'playlists' | 'single-playlist'; // Tipagem mais estrita
+  activeTab: 'home' | 'playlists' | 'single-playlist';
   setActiveTab: (tab: 'home' | 'playlists') => void;
 }
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const menuItems = [
     { id: 'home', label: 'Dashboard', icon: LayoutGrid, sub: 'Race Control' },
-    { id: 'playlists', label: 'Hangar', icon: FolderMusic, sub: 'Library' }, // ID Corrigido
-    // { id: 'history', label: 'Race History', icon: Library, sub: 'Archives' }, // Pode ativar futuramente
+    { id: 'playlists', label: 'Hangar', icon: Library, sub: 'Library' },
   ];
 
   return (
     <aside className="w-72 bg-[#050505] border-r border-zinc-800/50 flex flex-col relative overflow-hidden font-['Orbitron',sans-serif]">
-      {/* Carbon Fiber Pattern Overlay */}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03] pointer-events-none" />
       
-      {/* Brand Header */}
       <div className="p-8 relative">
         <div className="flex items-center gap-4 mb-8">
           <div className="relative group">
@@ -44,7 +41,6 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="flex flex-col gap-2">
           <div className="text-[9px] text-zinc-600 font-black tracking-[0.3em] uppercase mb-4 flex items-center gap-2">
             <div className="w-4 h-[1px] bg-zinc-800" /> Main Systems
@@ -80,7 +76,6 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </nav>
       </div>
 
-      {/* System Diagnostics Section */}
       <div className="mt-auto p-6 space-y-6">
         <div className="p-4 bg-[#0a0a0a] border border-zinc-800/50 rounded-2xl relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent" />
@@ -115,7 +110,6 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           </div>
         </div>
 
-        {/* User Profile / Driver Info */}
         <div className="flex items-center gap-3 p-2 bg-zinc-900/30 rounded-full border border-white/5">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-zinc-700 to-black border border-zinc-800 flex items-center justify-center text-[10px] font-black italic">
             DR
@@ -130,7 +124,6 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </div>
       </div>
 
-      {/* Aesthetic Bottom Strip */}
       <div className="h-1 w-full flex">
         <div className="w-1/2 bg-[#FF001D]" />
         <div className="w-1/2 bg-white" />
