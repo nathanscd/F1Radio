@@ -1,105 +1,109 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Home from './pages/Home';
+import Playlists from './pages/Playlists';
+import SinglePlaylist from './pages/SinglePlaylist';
 import F1RadioPlayer from './components/Player';
 
-// Playlist inicial (Pode ser vazia ou com sugestões)
-const INITIAL_PLAYLIST = [
-  { id: "8AYy-BcjRXg", title: "F1 Official Theme", artist: "Brian Tyler", thumbnail: "https://i.ytimg.com/vi/8AYy-BcjRXg/mqdefault.jpg" },
-  { id: "4TYv2PhG89A", title: "Smooth Operator", artist: "Sade", thumbnail: "https://i.ytimg.com/vi/4TYv2PhG89A/mqdefault.jpg" }
-];
+const API_KEY = 'AIzaSyCJPOUehloQZoKx6a8zaKP0rL5RNw1Sdhc';
 
 export default function App() {
-  const [playlist, setPlaylist] = useState(INITIAL_PLAYLIST);
-  const [currentTrack, setCurrentTrack] = useState(INITIAL_PLAYLIST[0]);
+  const [view, setView] = useState<'home' | 'playlists' | 'single-playlist'>('home');
+  const [searchTracks, setSearchTracks] = useState<any[]>([]);
+  const [currentTrack, setCurrentTrack] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
-  const [searchQuery, setSearchQuery] = useState('');
-  const playerRef = useRef<any>(null);
+  const [activePlaylist, setActivePlaylist] = useState<any>(null);
+  const [userPlaylists, setUserPlaylists] = useState<any[]>(() => {
+    const saved = localStorage.getItem('pitwall_playlists');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // Função para buscar músicas no YouTube via API pública de sugestão/search
-  // Nota: Para uma busca real e robusta, o ideal é usar a YouTube Data API v3 com uma API Key.
-  // Aqui usaremos uma lógica de atualização de estado para refletir a busca.
+  useEffect(() => {
+    localStorage.setItem('pitwall_playlists', JSON.stringify(userPlaylists));
+  }, [userPlaylists]);
+
   const handleSearch = async (query: string) => {
     if (!query) return;
-    
-    // Simulação de busca (Em um cenário real, você chamaria fetch para a API do YouTube)
-    // Exemplo de URL: `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&key=SUA_API_KEY`
-    console.log("Buscando por:", query);
-    // O usuário pode colar o ID do vídeo diretamente ou o link para tocar instantaneamente
-    if (query.includes('youtube.com/watch?v=') || query.includes('youtu.be/')) {
-      const id = query.split('v=')[1]?.split('&')[0] || query.split('/').pop();
-      if (id) {
-        const newTrack = { id, title: "Carregando...", artist: "YouTube Video", thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg` };
-        setCurrentTrack(newTrack);
-        setIsPlaying(true);
-      }
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=${query}&type=video&videoCategoryId=10&key=${API_KEY}`
+      );
+      const data = await response.json();
+      const tracks = data.items.map((item: any) => ({
+        id: item.id.videoId,
+        title: item.snippet.title,
+        artist: item.snippet.channelTitle,
+        thumbnail: item.snippet.thumbnails.high.url
+      }));
+      setSearchTracks(tracks);
+      setView('home');
+    } catch (error) {
+      console.error("YouTube API Error", error);
     }
   };
 
-  const handlePlayerStateChange = (state: any) => {
-    if (state === (window as any).YT.PlayerState.PLAYING) setIsPlaying(true);
-    if (state === (window as any).YT.PlayerState.PAUSED) setIsPlaying(false);
-    if (state === (window as any).YT.PlayerState.ENDED) handleNext();
+  const createPlaylist = (name: string) => {
+    const newPlaylist = { id: Date.now().toString(), name, tracks: [] };
+    setUserPlaylists([...userPlaylists, newPlaylist]);
   };
 
-  const handleNext = () => {
-    const idx = playlist.findIndex(t => t.id === currentTrack.id);
-    if (idx !== -1) setCurrentTrack(playlist[(idx + 1) % playlist.length]);
-  };
-
-  const handlePrev = () => {
-    const idx = playlist.findIndex(t => t.id === currentTrack.id);
-    if (idx !== -1) setCurrentTrack(playlist[(idx - 1 + playlist.length) % playlist.length]);
-  };
-
-  const togglePlay = () => {
-    if (!playerRef.current) return;
-    if (isPlaying) playerRef.current.pauseVideo();
-    else playerRef.current.playVideo();
+  const addToPlaylist = (playlistId: string, track: any) => {
+    setUserPlaylists(prev => prev.map(pl => 
+      pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl
+    ));
   };
 
   return (
-    <div className="flex h-screen bg-[#050505] text-white overflow-hidden font-['Orbitron',sans-serif]">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div className="flex h-screen bg-[#050505] text-white overflow-hidden font-['Orbitron']">
+      <Sidebar activeTab={view} setActiveTab={(v: any) => setView(v)} />
 
       <main className="flex-1 overflow-y-auto bg-gradient-to-br from-[#0a0a0a] to-black relative">
-        <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-red-900/20 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-red-900/10 via-transparent to-transparent pointer-events-none" />
         
         <div className="relative z-10">
-          {activeTab === 'home' && (
+          {view === 'home' && (
             <Home 
-              playlist={playlist} 
-              currentTrack={currentTrack} 
+              playlist={searchTracks} 
+              currentTrack={currentTrack || { id: '', title: '', artist: '', thumbnail: '' }} 
               isPlaying={isPlaying} 
-              onSelectTrack={(track) => {
-                setCurrentTrack(track);
-                setIsPlaying(true);
+              onSelectTrack={(t: any) => { 
+                setCurrentTrack(t); 
+                setIsPlaying(true); 
               }}
               onSearch={handleSearch}
+              userPlaylists={userPlaylists}
+              onAddToPlaylist={addToPlaylist}
+            />
+          )}
+
+          {view === 'playlists' && (
+            <Playlists 
+              playlists={userPlaylists} 
+              onCreate={createPlaylist} 
+              onOpen={(pl: any) => { setActivePlaylist(pl); setView('single-playlist'); }} 
+            />
+          )}
+
+          {view === 'single-playlist' && activePlaylist && (
+            <SinglePlaylist 
+              playlist={activePlaylist} 
+              onBack={() => setView('playlists')}
+              onPlayTrack={(t: any) => { setCurrentTrack(t); setIsPlaying(true); }}
             />
           )}
         </div>
       </main>
 
       <F1RadioPlayer 
-        currentTrack={currentTrack}
+        currentTrack={currentTrack || { id: '', title: '', artist: '', thumbnail: '' }}
         isPlaying={isPlaying}
-        onTogglePlay={togglePlay}
-        onNext={handleNext}
-        onPrev={handlePrev}
-        playlist={playlist}
-        onPlayerReady={(player) => { playerRef.current = player; }}
-        onStateChange={handlePlayerStateChange}
+        onTogglePlay={() => setIsPlaying(!isPlaying)}
+        onNext={() => {}}
+        onPrev={() => {}}
+        playlist={searchTracks}
+        onPlayerReady={() => {}}
+        onStateChange={() => {}}
       />
-
-      <style>{`
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #050505; }
-        ::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #FF0000; }
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-      `}</style>
     </div>
   );
 }

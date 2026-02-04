@@ -1,20 +1,20 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  LayoutGrid, Search, Library, Radio, Signal, 
-  Cpu, Zap, ShieldCheck, ChevronRight, Activity
+  LayoutGrid, FolderMusic, Radio, Signal, 
+  Cpu, Zap, ShieldCheck, ChevronRight, Activity, Library
 } from 'lucide-react';
 
 interface SidebarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  activeTab: 'home' | 'playlists' | 'single-playlist'; // Tipagem mais estrita
+  setActiveTab: (tab: 'home' | 'playlists') => void;
 }
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const menuItems = [
     { id: 'home', label: 'Dashboard', icon: LayoutGrid, sub: 'Race Control' },
-    { id: 'search', label: 'Telemetry', icon: Search, sub: 'Data Analysis' },
-    { id: 'history', label: 'Race History', icon: Library, sub: 'Archives' },
+    { id: 'playlists', label: 'Hangar', icon: FolderMusic, sub: 'Library' }, // ID Corrigido
+    // { id: 'history', label: 'Race History', icon: Library, sub: 'Archives' }, // Pode ativar futuramente
   ];
 
   return (
@@ -53,14 +53,14 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           {menuItems.map((item) => (
             <button 
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => setActiveTab(item.id as 'home' | 'playlists')}
               className={`group relative flex items-center gap-4 p-3 rounded-xl transition-all duration-300 overflow-hidden ${
-                activeTab === item.id 
+                activeTab === item.id || (activeTab === 'single-playlist' && item.id === 'playlists')
                 ? 'bg-zinc-900/80 text-white border border-zinc-800 shadow-xl' 
                 : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/5'
               }`}
             >
-              {activeTab === item.id && (
+              {(activeTab === item.id || (activeTab === 'single-playlist' && item.id === 'playlists')) && (
                 <motion.div 
                   layoutId="activeGlow"
                   className="absolute left-0 w-1 h-6 bg-[#FF001D] rounded-r-full shadow-[0_0_10px_#FF001D]"
