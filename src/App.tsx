@@ -5,14 +5,12 @@ import Home from './pages/Home';
 import Playlists from './pages/Playlists';
 import SinglePlaylist from './pages/SinglePlaylist';
 import F1RadioPlayer from './components/Player';
-import CarMode from './components/CarMode';
+import CyberCarMode from './components/CarMode';
 import CustomCursor from './components/CustomCursor';
 import type { Playlist, Track } from './types';
-
 import 'leaflet/dist/leaflet.css';
 
-// Tente usar sua chave, mas o código agora tem um fallback robusto e resiliente
-const API_KEY = 'AIzaSyDhdqoUm-it5aPj6okMruFQ6xRIpqHp1VY';
+const BACKEND_URL = "https://sua-url-do-render.onrender.com";
 
 declare global {
   interface Window {
@@ -34,6 +32,7 @@ export default function App() {
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
   const [playerQueue, setPlayerQueue] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const playerRef = useRef<any>(null);
 
@@ -43,70 +42,30 @@ export default function App() {
 
   useEffect(() => {
     if (window.updateNeuralTitle) {
-      if (currentTrack && isPlaying) window.updateNeuralTitle(currentTrack.title, currentTrack.artist);
-      else window.updateNeuralTitle('SYSTEM_IDLE', '');
+      if (currentTrack && isPlaying) {
+        window.updateNeuralTitle(currentTrack.title, currentTrack.artist);
+      } else {
+        window.updateNeuralTitle('SYSTEM_IDLE', '');
+      }
     }
   }, [currentTrack, isPlaying]);
 
-  // --- SERVIÇO DE BUSCA ROBUSTO (COM MÚLTIPLOS FALLBACKS) ---
   const fetchYouTubeData = async (query: string): Promise<Track[]> => {
     if (!query || query.trim().length < 2) return [];
+    setErrorMessage(null);
     
-    // 1. TENTATIVA COM API KEY OFICIAL
     try {
-      const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${API_KEY}`
-      );
+      const response = await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
+      
       if (response.ok) {
-        const data = await response.json();
-        if (data.items && data.items.length > 0) {
-          return data.items.map((item: any) => ({
-            id: item.id.videoId,
-            title: item.snippet.title,
-            artist: item.snippet.channelTitle,
-            thumbnail: item.snippet.thumbnails.high.url
-          }));
-        }
+        return await response.json();
+      } else {
+        throw new Error("SERVER_ERROR");
       }
     } catch (e) {
-      console.warn("OFFICIAL_API_FAILED, TRYING_FALLBACKS...");
+      setErrorMessage("PROTOCOLO_DE_BUSCA_OFFLINE: O back-end no Render ainda está inicializando ou está fora do ar.");
+      return [];
     }
-
-    // 2. FALLBACK: Múltiplas instâncias do Piped (Mais resiliente a CORS)
-    const pipedInstances = [
-      'https://pipedapi.kavin.rocks',
-      'https://api.piped.victr.me',
-      'https://piped-api.garudalinux.org',
-      'https://pipedapi.moomoo.me'
-    ];
-
-    for (const instance of pipedInstances) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-        
-        const fallbackRes = await fetch(`${instance}/search?q=${encodeURIComponent(query)}&filter=videos`, {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        
-        if (fallbackRes.ok) {
-          const fallbackData = await fallbackRes.json();
-          if (fallbackData && fallbackData.items) {
-            return fallbackData.items.map((item: any) => ({
-              id: item.url.split('v=')[1] || item.videoId,
-              title: item.title,
-              artist: item.uploaderName,
-              thumbnail: item.thumbnail
-            }));
-          }
-        }
-      } catch (e) {
-        console.warn(`FALLBACK_FAILED_ON_INSTANCE: ${instance}`);
-      }
-    }
-
-    return [];
   };
 
   const handleGlobalSearch = async (query: string) => {
@@ -115,7 +74,7 @@ export default function App() {
     try {
       const tracks = await fetchYouTubeData(query);
       setSearchTracks(tracks);
-      if (!isCarMode) setView('home');
+      if (!isCarMode && tracks.length > 0) setView('home');
     } finally {
       setIsSearching(false);
     }
@@ -144,18 +103,60 @@ export default function App() {
   const activePlaylist = userPlaylists.find(pl => pl.id === activePlaylistId);
 
   return (
-    <div className="flex h-screen bg-[#020202] text-white overflow-hidden font-['Space_Mono',monospace]">
+    <div className="flex h-screen bg-[#020202] text-white overflow-hidden font-mono h-[100dvh]">
       <CustomCursor />
 
       <AnimatePresence>
+        {errorMessage && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div className="border-2 border-red-500/50 bg-[#0a0000] p-6 max-w-md w-full relative">
+              <div className="flex items-center gap-3 text-red-500 mb-4 font-bold uppercase tracking-tighter">
+                <span className="w-2 h-2 bg-red-500 animate-ping" />
+                Erro_Critico_de_Dados
+              </div>
+              <div className="text-zinc-400 text-[10px] mb-6 leading-relaxed uppercase">
+                {errorMessage}
+              </div>
+              <button 
+                onClick={() => setErrorMessage(null)} 
+                className="w-full border border-red-500/30 py-3 text-[10px] font-black uppercase hover:bg-red-500 transition-all"
+              >
+                Ignorar_Alerta
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showCarPrompt && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[5000] bg-black/95 backdrop-blur-md flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[5000] bg-black/95 backdrop-blur-md flex items-center justify-center p-6"
+          >
             <div className="border border-[#00F3FF] p-8 bg-[#020202] relative max-w-sm w-full">
               <div className="text-[#00F3FF] text-[10px] font-bold mb-2 uppercase tracking-[0.3em] animate-pulse">Auto_Detect: Landscape</div>
-              <h2 className="text-xl font-black mb-8 uppercase italic leading-tight">Initialize <span className="text-[#00F3FF]">Cyber_HUD</span>?</h2>
+              <h2 className="text-xl font-black mb-8 uppercase italic leading-tight">Inicializar <span className="text-[#00F3FF]">Cyber_HUD</span>?</h2>
               <div className="flex gap-4">
-                <button onClick={() => { setIsCarMode(true); setShowCarPrompt(false); }} className="flex-1 bg-[#00F3FF] text-black py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-white transition-colors">Confirm</button>
-                <button onClick={() => setShowCarPrompt(false)} className="flex-1 border border-zinc-800 text-zinc-500 py-4 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-colors">Ignore</button>
+                <button 
+                  onClick={() => { setIsCarMode(true); setShowCarPrompt(false); }} 
+                  className="flex-1 bg-[#00F3FF] text-black py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-white transition-colors"
+                >
+                  Confirmar
+                </button>
+                <button 
+                  onClick={() => setShowCarPrompt(false)} 
+                  className="flex-1 border border-zinc-800 text-zinc-500 py-4 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-colors"
+                >
+                  Ignorar
+                </button>
               </div>
             </div>
           </motion.div>
@@ -163,7 +164,7 @@ export default function App() {
       </AnimatePresence>
 
       {isCarMode ? (
-        <CarMode 
+        <CyberCarMode 
           currentTrack={currentTrack} 
           isPlaying={isPlaying} 
           onTogglePlay={() => setIsPlaying(!isPlaying)}
@@ -177,7 +178,12 @@ export default function App() {
         />
       ) : (
         <>
-          <Sidebar activeTab={view} setActiveTab={(v: any) => setView(v)} isCarMode={isCarMode} onToggleCarMode={(val: boolean) => setIsCarMode(val)} />
+          <Sidebar 
+            activeTab={view} 
+            setActiveTab={(v: any) => setView(v)} 
+            isCarMode={isCarMode} 
+            onToggleCarMode={(val: boolean) => setIsCarMode(val)} 
+          />
           <main className="flex-1 overflow-y-auto bg-[#050505] relative custom-scrollbar">
             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00F3FF]/5 via-transparent to-transparent pointer-events-none" />
             <div className="relative z-10">
