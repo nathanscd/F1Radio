@@ -1,8 +1,140 @@
 @import "tailwindcss";
 
-body {
-  background-color: black;
-  color: white;
-  margin: 0;
-  font-family: sans-serif;
+@theme {
+  --color-cyan-vibranium: #00f3ff;
+  --color-magenta-glitch: #ff003c;
+  --color-dark-void: #020202;
+  --color-dark-bg: #050505;
+
+  --font-mono: "Space Mono", monospace;
+  
+  --animate-scanline: scanline 6s linear infinite;
+  --animate-glitch: glitch 0.3s infinite;
+  --animate-flicker: flicker 0.15s infinite;
+
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+
+  @keyframes glitch {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+  }
+
+  @keyframes flicker {
+    0% { opacity: 0.27; }
+    5% { opacity: 0.31; }
+    10% { opacity: 0.18; }
+    15% { opacity: 0.25; }
+    20% { opacity: 0.15; }
+    25% { opacity: 0.35; }
+    30% { opacity: 0.22; }
+    35% { opacity: 0.32; }
+    40% { opacity: 0.25; }
+    45% { opacity: 0.35; }
+    50% { opacity: 0.22; }
+    55% { opacity: 0.32; }
+    60% { opacity: 0.25; }
+    65% { opacity: 0.35; }
+    70% { opacity: 0.22; }
+    75% { opacity: 0.32; }
+    80% { opacity: 0.25; }
+    85% { opacity: 0.35; }
+    90% { opacity: 0.22; }
+    95% { opacity: 0.32; }
+    100% { opacity: 0.25; }
+  }
+}
+
+@layer base {
+  *, ::after, ::before {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--color-dark-void);
+  }
+
+  body {
+    @apply font-mono bg-dark-void text-white antialiased overflow-x-hidden min-h-screen selection:bg-cyan-vibranium selection:text-black;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply uppercase tracking-tighter italic font-black;
+  }
+
+  input, button, textarea {
+    @apply outline-none appearance-none;
+  }
+}
+
+@layer utilities {
+  .cyber-grid {
+    background-image: 
+      linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+
+  .text-shadow-cyan {
+    text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+  }
+
+  .crt-overlay::after {
+    content: " ";
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 9999;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-1 h-1;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-zinc-800 border-none transition-all;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-cyan-vibranium shadow-[0_0_10px_#00f3ff];
+  }
+
+  @media (max-width: 768px) {
+    .cyber-grid {
+      background-size: 20px 20px;
+    }
+    
+    body {
+      @apply text-[14px];
+    }
+  }
+}
+
+.no-cursor {
+  cursor: none !important;
+}
+
+@media (pointer: coarse) {
+  .no-cursor {
+    cursor: auto !important;
+  }
 }
