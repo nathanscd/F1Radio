@@ -190,10 +190,10 @@ export default function CyberPlayer({
               <ScanLine />
               <div className={`w-1.5 h-full transition-all duration-500 ${isPlaying ? 'bg-[#00F3FF] shadow-[0_0_20px_#00F3FF]' : 'bg-zinc-800'}`} />
               <div className="flex-1 flex items-center px-5 gap-4 relative z-20">
-                {currentTrack.thumbnail && <img src={currentTrack.thumbnail} className={`w-12 h-12 object-cover border border-zinc-800 transition-all duration-700 ${isPlaying ? 'grayscale-0' : 'grayscale'}`} alt="" />}
+                <img src={currentTrack.thumbnail} className={`w-12 h-12 object-cover border border-zinc-800 transition-all duration-700 ${isPlaying ? 'grayscale-0' : 'grayscale'}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-black text-white uppercase truncate">{periodicGlitch || glitchActive ? <GlitchText text={currentTrack.title} /> : currentTrack.title}</div>
-                  <div className="text-[9px] text-zinc-500 uppercase truncate">{currentTrack.artist}</div>
+                  <p className="text-xs font-black text-white uppercase truncate">{periodicGlitch || glitchActive ? <GlitchText text={currentTrack.title} /> : currentTrack.title}</p>
+                  <p className="text-[9px] text-zinc-500 uppercase truncate">{currentTrack.artist}</p>
                 </div>
                 <ChevronUp size={16} className="text-zinc-700" />
               </div>
@@ -219,10 +219,10 @@ export default function CyberPlayer({
             </div>
             <div className="p-6">
               <div className="flex gap-5 mb-6">
-                {currentTrack.thumbnail && <img src={currentTrack.thumbnail} className="w-24 h-24 object-cover border border-zinc-800" alt="" />}
+                <img src={currentTrack.thumbnail} className="w-24 h-24 object-cover border border-zinc-800" />
                 <div className="flex-1">
                   <h3 className="text-sm font-black text-white uppercase line-clamp-2">{currentTrack.title}</h3>
-                  <div className="text-[10px] text-zinc-500 uppercase">{currentTrack.artist}</div>
+                  <p className="text-[10px] text-zinc-500 uppercase">{currentTrack.artist}</p>
                 </div>
               </div>
               <div className="flex items-center justify-between mb-6 bg-black p-3 border border-zinc-800">
@@ -235,57 +235,20 @@ export default function CyberPlayer({
                   <Volume2 size={16} />
                   <div className="flex-1 h-1 bg-zinc-900 relative">
                     <div className="h-full bg-[#00F3FF]" style={{ width: `${volume}%` }} />
-                    <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="absolute inset-0 w-full h-full opacity-0" />
                   </div>
                 </div>
               </div>
-              <div className="flex border-t border-zinc-800">
-                {['system', 'queue', 'terminal'].map(tab => (
-                  <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-3 text-[9px] uppercase font-black tracking-widest transition-all ${activeTab === tab ? 'text-[#00F3FF] bg-[#00F3FF]/5 border-b-2 border-[#00F3FF]' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                    {tab}
+              <div className="flex gap-1 text-[9px] font-bold">
+                {[
+                  { id: 'system', label: 'SYS_MON', icon: Activity },
+                  { id: 'queue', label: 'DATA_Q', icon: List },
+                  { id: 'terminal', label: 'TERM_L', icon: Terminal }
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 py-2 border ${activeTab === tab.id ? 'border-[#00F3FF] text-[#00F3FF]' : 'border-zinc-800'}`}>
+                    <tab.icon size={10} className="inline mr-1" /> {tab.label}
                   </button>
                 ))}
-              </div>
-              <div className="h-48 overflow-y-auto p-4 bg-black/40 custom-scrollbar text-[10px]">
-                {activeTab === 'system' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 border border-zinc-800 bg-zinc-900/30">
-                        <div className="flex justify-between mb-2"><Cpu size={12}/><span className="text-[#00F3FF]">{sysStats.cpu}%</span></div>
-                        <div className="h-1 bg-zinc-800"><div className="h-full bg-[#00F3FF]" style={{ width: `${sysStats.cpu}%` }} /></div>
-                      </div>
-                      <div className="p-3 border border-zinc-800 bg-zinc-900/30">
-                        <div className="flex justify-between mb-2"><Activity size={12}/><span className="text-[#FF003C]">{sysStats.temp}°C</span></div>
-                        <div className="h-1 bg-zinc-800"><div className="h-full bg-[#FF003C]" style={{ width: `${(sysStats.temp/100)*100}%` }} /></div>
-                      </div>
-                    </div>
-                    <div className="space-y-1 text-zinc-500 leading-relaxed uppercase">
-                      <div className="flex justify-between"><span>Neural_Uplink:</span><span className="text-white">Active</span></div>
-                      <div className="flex justify-between"><span>Encryption:</span><span className="text-white">AES-256</span></div>
-                      <div className="flex justify-between"><span>Bitrate:</span><span className="text-white">1411kbps</span></div>
-                    </div>
-                  </div>
-                )}
-                {activeTab === 'queue' && (
-                  <div className="space-y-2">
-                    {playlist.map((track, i) => (
-                      <div key={track.id} onClick={() => onSelectTrack(track)} className={`flex items-center gap-3 p-2 border border-zinc-900 hover:border-[#00F3FF]/30 cursor-pointer transition-all ${currentTrack.id === track.id ? 'bg-[#00F3FF]/5 border-[#00F3FF]/50' : ''}`}>
-                        <span className="text-[8px] text-zinc-700">0{i+1}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] text-white uppercase truncate">{track.title}</div>
-                          <div className="text-[8px] text-zinc-600 uppercase">{track.artist}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {activeTab === 'terminal' && (
-                  <div className="space-y-1 text-[#00F3FF]/60 font-mono leading-tight uppercase">
-                    {lyrics.map((line, i) => (
-                      <div key={i} className="hover:text-[#00F3FF] transition-colors">{line}</div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </motion.div>
@@ -295,54 +258,90 @@ export default function CyberPlayer({
         {viewMode === 'fullscreen' && (
           <motion.div
             key="fullscreen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-[#020202] flex flex-col p-12 overflow-hidden"
+            className="fixed inset-0 z-[200] bg-[#020202] text-[#00F3FF] p-6 flex flex-col overflow-hidden"
           >
             <ScanLine />
-            <div className="flex justify-between items-start mb-12">
+            <div className="flex justify-between border-b border-[#00F3FF]/30 pb-4 mb-6 relative z-10">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 border-2 border-[#00F3FF] flex items-center justify-center animate-pulse"><Disc className="text-[#00F3FF]" /></div>
-                <div>
-                  <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Cyber_Radio_Terminal_v4.0</h1>
-                  <div className="text-[10px] text-[#00F3FF] uppercase tracking-[0.4em] font-black">Secure_Audio_Uplink_Active</div>
-                </div>
+                <div className="w-3 h-3 bg-[#FF003C] animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-widest">System_Link_v4.0</span>
               </div>
-              <button onClick={() => setViewMode('card')} className="p-4 border border-zinc-800 hover:border-[#FF003C] hover:text-[#FF003C] transition-all"><X size={32}/></button>
+              <button onClick={() => setViewMode('card')} className="p-3 border border-[#FF003C] text-[#FF003C] hover:bg-[#FF003C] hover:text-black transition-all">
+                <X size={20} />
+              </button>
             </div>
 
-            <div className="flex-1 flex gap-12 min-h-0">
-              <div className="flex-1 flex flex-col justify-center">
-                <div className="relative group">
-                  <div className="absolute -inset-10 bg-[#00F3FF]/5 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-all duration-1000" />
-                  <img src={currentTrack.thumbnail} className="w-full aspect-square object-cover border-4 border-zinc-900 shadow-[0_0_80px_rgba(0,0,0,0.5)]" alt="" />
+            <div className="flex-1 grid grid-cols-12 gap-6 overflow-hidden relative z-10">
+              
+              {/* SEARCH & QUEUE */}
+              <div className="col-span-3 flex flex-col gap-4 border-r border-white/5 pr-6">
+                <div className="bg-[#001010] border border-[#00F3FF]/30 p-4">
+                  <div className="text-[10px] mb-3 flex items-center gap-2"><SearchIcon size={12} /> SEARCH_NETWORK</div>
+                  <div className="flex bg-black border border-zinc-800 p-2">
+                    <span className="text-[#00F3FF] mr-2">{'>'}</span>
+                    <input type="text" placeholder="QUERY..." className="bg-transparent border-none outline-none text-xs w-full uppercase" onKeyDown={(e) => { if(e.key === 'Enter') onSearch((e.target as HTMLInputElement).value); }} />
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar border border-zinc-900 bg-black/20 p-2">
+                  {playlist.map((t, i) => (
+                    <button key={t.id} onClick={() => onSelectTrack(t)} className={`w-full flex items-center gap-3 p-2 mb-1 text-left ${currentTrack.id === t.id ? 'bg-[#00F3FF]/10 border-l-2 border-[#00F3FF]' : 'hover:bg-white/5'}`}>
+                      <span className="text-[9px] opacity-30">{String(i+1).padStart(2, '0')}</span>
+                      <span className={`text-[10px] font-bold truncate ${currentTrack.id === t.id ? 'text-[#00F3FF]' : 'text-zinc-400'}`}>{t.title}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="flex-[1.5] flex flex-col justify-between py-12">
-                <div>
-                  <div className="text-[#FF003C] text-xs font-black uppercase tracking-[0.5em] mb-4">Now_Playing_Stream</div>
-                  <h2 className="text-7xl font-black text-white uppercase tracking-tighter leading-[0.8] mb-6">
-                    {periodicGlitch ? <GlitchText text={currentTrack.title} /> : currentTrack.title}
-                  </h2>
-                  <div className="text-3xl font-black text-[#00F3FF] uppercase tracking-widest flex items-center gap-4"><Mic2 /> {currentTrack.artist}</div>
-                </div>
 
-                <div className="space-y-12">
-                  <div className="space-y-4">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                      <span>Neural_Sync_Progress</span>
-                      <span className="text-[#00F3FF]">{Math.floor(progress)}%</span>
-                    </div>
-                    <div className="h-2 bg-zinc-900 relative">
-                      <div className="h-full bg-[#00F3FF] shadow-[0_0_20px_#00F3FF]" style={{ width: `${progress}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-12">
-                    <button onClick={onPrev} className="p-6 border border-zinc-800 hover:border-[#00F3FF] transition-all"><SkipBack size={40} /></button>
-                    <button onClick={onTogglePlay} className="w-32 h-32 rounded-full border-4 border-[#00F3FF] flex items-center justify-center hover:bg-[#00F3FF]/5 transition-all">
-                      {isPlaying ? <Pause size={60} className="text-[#00F3FF]" /> : <Play size={60} className="text-[#00F3FF] fill-[#00F3FF] ml-4" />}
+              {/* CORE VISUALS */}
+              <div className="col-span-5 flex flex-col items-center justify-center gap-6">
+                <div className="relative w-full aspect-square max-w-[450px] group border border-[#00F3FF] shadow-[0_0_50px_rgba(0,243,255,0.1)]">
+                  <img src={currentTrack.thumbnail} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={onTogglePlay} className="w-20 h-20 bg-black/80 border-2 border-[#00F3FF] flex items-center justify-center text-[#00F3FF] rounded-full shadow-[0_0_30px_#00F3FF]">
+                      {isPlaying ? <Pause size={32} /> : <Play size={32} fill="currentColor" />}
                     </button>
-                    <button onClick={onNext} className="p-6 border border-zinc-800 hover:border-[#00F3FF] transition-all"><SkipForward size={40} /></button>
                   </div>
+                </div>
+                <div className="text-center">
+                  <h2 className="text-4xl font-black uppercase text-white leading-tight">{currentTrack.title}</h2>
+                  <p className="text-[#FF003C] font-bold tracking-[0.4em] text-xs mt-2">{currentTrack.artist}</p>
+                </div>
+              </div>
+
+              {/* LYRICS TERMINAL */}
+              <div className="col-span-4 border-l border-white/5 pl-6 flex flex-col overflow-hidden">
+                <div className="flex items-center gap-2 mb-4"><Mic2 size={16} /> <span className="text-xs font-bold uppercase tracking-widest">Lyric_Stream_Decryptor</span></div>
+                <div className="flex-1 bg-[#050505] border border-zinc-800 p-6 overflow-y-auto custom-scrollbar">
+                  <div className="space-y-6 text-zinc-400">
+                    <p className="opacity-40 text-[10px] font-mono italic">// INITIALIZING_LYRIC_DECODER... <br/> // SOURCE: LRCLIB_DATABASE</p>
+                    {lyrics.length > 0 ? lyrics.map((line, i) => (
+                      <p key={i} className="text-lg leading-relaxed hover:text-[#00F3FF] transition-colors">{line}</p>
+                    )) : <p className="animate-pulse">DECODING_DATA_STREAM...</p>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* TRANSPORT BAR */}
+            <div className="mt-8 bg-black/50 border border-zinc-800 p-6 flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-8">
+                <button onClick={onPrev}><SkipBack size={32} /></button>
+                <button onClick={onTogglePlay} className="w-16 h-16 bg-[#00F3FF]/10 border border-[#00F3FF] flex items-center justify-center">
+                  {isPlaying ? <Pause size={28} /> : <Play size={28} fill="currentColor" />}
+                </button>
+                <button onClick={onNext}><SkipForward size={32} /></button>
+              </div>
+              <div className="flex-1 mx-20 flex flex-col gap-2">
+                <div className="h-1 bg-zinc-900 w-full relative group">
+                  <div className="absolute inset-y-0 left-0 bg-[#00F3FF] shadow-[0_0_15px_#00F3FF]" style={{ width: `${progress}%` }} />
+                  <input type="range" value={progress} onChange={(e) => playerRef.current?.seekTo((parseFloat(e.target.value)/100)*playerRef.current.getDuration())} className="absolute inset-0 w-full h-full opacity-0 z-20" />
+                </div>
+              </div>
+              <div className="flex items-center gap-6 w-64">
+                <Volume2 size={20} />
+                <div className="flex-1 h-1 bg-zinc-900 relative">
+                  <div className="h-full bg-white" style={{ width: `${volume}%` }} />
+                  <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="absolute inset-0 w-full h-full opacity-0" />
                 </div>
               </div>
             </div>
