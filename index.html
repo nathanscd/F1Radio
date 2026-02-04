@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     
@@ -13,13 +13,14 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
     
     <title>NETRUNNER // BOOTING...</title>
 
     <style>
       :root {
         --cyan: #00F3FF;
+        --pink: #FF003C;
         --bg: #020202;
       }
 
@@ -72,21 +73,24 @@
       }
 
       .glitch-text {
-        font-size: clamp(18px, 5vw, 24px);
-        font-weight: 700;
-        letter-spacing: 0.5em;
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(24px, 6vw, 36px);
+        font-weight: 900;
+        letter-spacing: 0.3em;
         text-transform: uppercase;
-        text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
-        margin-bottom: 20px;
+        text-shadow: 2px 0 var(--pink), -2px 0 var(--cyan);
+        margin-bottom: 30px;
         text-align: center;
+        animation: pulse 2s infinite;
       }
 
       .loader-container {
-        width: clamp(200px, 60vw, 300px);
-        height: 4px;
-        background: rgba(0, 243, 255, 0.1);
+        width: clamp(250px, 70vw, 400px);
+        height: 6px;
+        background: rgba(0, 243, 255, 0.05);
         position: relative;
         border: 1px solid rgba(0, 243, 255, 0.2);
+        clip-path: polygon(2% 0, 100% 0, 98% 100%, 0 100%);
       }
 
       .loader-progress {
@@ -96,30 +100,36 @@
         height: 100%;
         width: 0%;
         background: var(--cyan);
-        box-shadow: 0 0 15px var(--cyan);
-        animation: load 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        box-shadow: 0 0 20px var(--cyan);
+        animation: load 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
       }
 
       .terminal-log {
-        margin-top: 20px;
-        font-size: 10px;
-        color: rgba(0, 243, 255, 0.6);
+        margin-top: 25px;
+        font-size: 11px;
+        color: rgba(0, 243, 255, 0.7);
         text-transform: uppercase;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.2em;
         height: 1.5em;
+        font-weight: bold;
       }
 
       @keyframes load {
         0% { width: 0%; }
-        20% { width: 15%; }
-        50% { width: 60%; }
-        80% { width: 85%; }
+        20% { width: 25%; }
+        45% { width: 65%; }
+        85% { width: 92%; }
         100% { width: 100%; }
       }
 
       @keyframes scan {
         0% { top: -10%; }
         100% { top: 110%; }
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.8; transform: scale(0.98); }
       }
     </style>
   </head>
@@ -138,19 +148,34 @@
     </div>
 
     <script>
-      const originalTitle = "● ONLINE // NETRUNNER";
-      const awayTitle = "⚠ SIGNAL_LOST";
+      // Lógica de Título Dinâmico (Global)
+      window.updateNeuralTitle = function(trackTitle, artist) {
+        if (trackTitle && trackTitle !== 'SYSTEM_IDLE') {
+          document.title = `▶ ${trackTitle.toUpperCase()} // ${artist.toUpperCase()}`;
+        } else {
+          document.title = "● ONLINE // NETRUNNER_OS";
+        }
+      };
+
+      const awayTitle = "⚠ SIGNAL_LOST // STANDBY";
+      let lastActiveTitle = "● ONLINE // NETRUNNER_OS";
       
       document.addEventListener("visibilitychange", () => {
-        document.title = document.hidden ? awayTitle : originalTitle;
+        if (document.hidden) {
+          lastActiveTitle = document.title;
+          document.title = awayTitle;
+        } else {
+          document.title = lastActiveTitle;
+        }
       });
 
+      // Sequência de Boot
       const logs = [
         "> Establishing Secure Uplink...",
         "> Handshaking Neural_Link...",
         "> Decrypting Core_Assets...",
         "> Mounting Data_Banks...",
-        "> Access Granted."
+        "> System Stable. Access Granted."
       ];
       
       let i = 0;
@@ -165,19 +190,21 @@
           } else {
             clearInterval(interval);
           }
-        }, 450);
+        }, 500);
       }
 
-      const glitches = ["N3trunn3r_OS", "Netrunner_OS", "N€trunner_OS", "Netrunner_0S"];
+      // Efeito de Glitch no Logo
+      const glitches = ["N3trunn3r_OS", "Netrunner_OS", "N€trunner_OS", "Netrunner_0S", "N.E.T.R.U.N.N.E.R"];
       setInterval(() => {
-        if(brandEl && Math.random() > 0.8) {
-          const original = brandEl.innerText;
+        if(brandEl && Math.random() > 0.85) {
           brandEl.innerText = glitches[Math.floor(Math.random() * glitches.length)];
-          setTimeout(() => brandEl.innerText = "Netrunner_OS", 100);
+          brandEl.style.color = Math.random() > 0.5 ? '#FF003C' : '#00F3FF';
+          setTimeout(() => {
+            brandEl.innerText = "Netrunner_OS";
+            brandEl.style.color = '#00F3FF';
+          }, 120);
         }
-      }, 2000);
-
-      window.onload = () => { document.title = originalTitle; };
+      }, 2500);
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
