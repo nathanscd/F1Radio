@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 /* --- CONFIG --- */
-const BACKEND_URL =   "http://localhost:10000";
+const BACKEND_URL =  "https://f1radio.onrender.com";
 const GPS_UPDATE_THROTTLE = 500;
 const ROUTE_RECALC_THRESHOLD = 50;
 

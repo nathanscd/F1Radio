@@ -10,7 +10,7 @@ import CustomCursor from './components/CustomCursor';
 import type { Playlist, Track } from './types';
 import 'leaflet/dist/leaflet.css';
 
-const BACKEND_URL = "http://localhost:10000";
+const BACKEND_URL = "https://f1radio.onrender.com";
 
 declare global {
   interface Window {
