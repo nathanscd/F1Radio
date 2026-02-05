@@ -5,7 +5,7 @@ import {
   Volume2, Cpu, Activity, Terminal, HardDrive, 
   Wifi, Power, ChevronUp, X, Disc, Radio,
   List, Mic2, Zap, Shield, Database, Search as SearchIcon, FileCode, Share2,
-  ChevronDown
+  ChevronDown, Trash2, Plus
 } from 'lucide-react';
 
 /* --- TYPES --- */
@@ -34,6 +34,8 @@ interface CyberPlayerProps {
   onPlayerReady: (player: any) => void;
   onStateChange: (state: any) => void;
   onSelectTrack: (track: Track) => void;
+  // Novas props para manipulação de fila local (opcional, se suportado pelo pai)
+  onRemoveFromQueue?: (trackId: string) => void; 
 }
 
 /* --- STYLES & PRESETS --- */
@@ -60,7 +62,7 @@ const GlitchText = ({ text, className }: { text: string, className?: string }) =
 
 export default function CyberPlayer({ 
   currentTrack, isPlaying, onTogglePlay, onNext, onPrev, onSearch,
-  playlist, onPlayerReady, onStateChange, onSelectTrack 
+  playlist, onPlayerReady, onStateChange, onSelectTrack, onRemoveFromQueue
 }: CyberPlayerProps) {
   const [viewMode, setViewMode] = useState<'dock' | 'card' | 'fullscreen'>('dock');
   const [activeTab, setActiveTab] = useState<'system' | 'queue' | 'terminal'>('system');
@@ -71,6 +73,10 @@ export default function CyberPlayer({
   const [glitchActive, setGlitchActive] = useState(false);
   const [periodicGlitch, setPeriodicGlitch] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Local Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
   
   const playerRef = useRef<any>(null);
 
@@ -125,7 +131,7 @@ export default function CyberPlayer({
   /* --- LYRICS DECRYPTOR LOGIC --- */
   useEffect(() => {
     const fetchLyrics = async () => {
-      setLyrics([]);
+      setLyrics(["// DECRYPTING_AUDIO_STREAM...", "// ANALYZING_WAVEFORMS..."]);
       try {
         const res = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(currentTrack.artist)}&track_name=${encodeURIComponent(currentTrack.title)}`);
         const data = await res.json();
@@ -170,6 +176,12 @@ export default function CyberPlayer({
 
     return () => { clearInterval(interval); clearInterval(glitchTimer); };
   }, [isPlaying]);
+
+  const handleLocalSearch = (e: React.FormEvent) => {
+      e.preventDefault();
+      onSearch(searchQuery);
+      setSearchQuery('');
+  };
 
   return (
     <div className="font-mono text-zinc-400 selection:bg-[#00F3FF] selection:text-black">
@@ -221,34 +233,43 @@ export default function CyberPlayer({
           >
             <ScanLine />
             <div className="bg-white/5 p-4 border-b border-zinc-800 flex justify-between items-center">
-              <Terminal size={14} className="text-[#00F3FF]" />
+              <div className="flex items-center gap-2 text-[#00F3FF]">
+                  <Terminal size={14} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Nano_Audio_v2</span>
+              </div>
               <div className="flex gap-2">
                 <button onClick={() => setViewMode('fullscreen')} className="p-1 hover:text-[#00F3FF]"><Maximize2 size={14}/></button>
                 <button onClick={() => setViewMode('dock')} className="p-1 hover:text-[#FF003C]"><X size={14}/></button>
               </div>
             </div>
             <div className="p-6">
-              <div className="flex gap-5 mb-6">
+              <div className="flex gap-5 mb-6 relative">
                 <img src={currentTrack.thumbnail} className="w-24 h-24 object-cover border border-zinc-800" alt="" />
-                <div className="flex-1">
-                  <h3 className="text-sm font-black text-white uppercase line-clamp-2">{currentTrack.title}</h3>
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <h3 className="text-sm font-black text-white uppercase line-clamp-2 leading-tight mb-1">{currentTrack.title}</h3>
                   <p className="text-[10px] text-zinc-500 uppercase">{currentTrack.artist}</p>
                 </div>
               </div>
+
+              {/* CONTROLS */}
               <div className="flex items-center justify-between mb-6 bg-black p-3 border border-zinc-800">
-                <button onClick={onPrev}><SkipBack size={20} /></button>
-                <button onClick={onTogglePlay} className="w-12 h-12 rounded-full border border-[#00F3FF] flex items-center justify-center">
+                <button onClick={onPrev} className="hover:text-white transition-colors"><SkipBack size={20} /></button>
+                <button onClick={onTogglePlay} className="w-12 h-12 rounded-full border border-[#00F3FF] flex items-center justify-center hover:bg-[#00F3FF]/10 transition-colors">
                   {isPlaying ? <Pause size={22} className="text-[#00F3FF]" /> : <Play size={22} className="text-[#00F3FF] fill-[#00F3FF]" />}
                 </button>
-                <button onClick={onNext}><SkipForward size={20} /></button>
-                <div className="flex items-center gap-2 w-24 ml-2">
-                  <Volume2 size={16} />
+                <button onClick={onNext} className="hover:text-white transition-colors"><SkipForward size={20} /></button>
+                
+                {/* Volume Slider */}
+                <div className="flex items-center gap-2 w-24 ml-2 group">
+                  <Volume2 size={16} className="text-zinc-600 group-hover:text-white transition-colors"/>
                   <div className="flex-1 h-1 bg-zinc-900 relative">
                     <div className="h-full bg-[#00F3FF]" style={{ width: `${volume}%` }} />
                     <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="absolute inset-0 opacity-0 cursor-pointer" />
                   </div>
                 </div>
               </div>
+
+              {/* TABS */}
               <div className="flex border-t border-zinc-800">
                 {['system', 'queue', 'terminal'].map(tab => (
                   <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-3 text-[9px] uppercase font-black tracking-widest transition-all ${activeTab === tab ? 'text-[#00F3FF] bg-[#00F3FF]/5 border-b-2 border-[#00F3FF]' : 'text-zinc-600 hover:text-zinc-400'}`}>
@@ -259,6 +280,17 @@ export default function CyberPlayer({
               <div className="h-48 overflow-y-auto p-4 bg-black/40 custom-scrollbar text-[10px]">
                 {activeTab === 'system' && (
                   <div className="space-y-4">
+                     {/* Search in Card Mode */}
+                     <form onSubmit={handleLocalSearch} className="flex gap-2 mb-4">
+                        <input 
+                            type="text" 
+                            value={searchQuery} 
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="INJECT_NEW_QUERY..." 
+                            className="flex-1 bg-zinc-900/50 border border-zinc-700 p-2 text-[10px] text-[#00F3FF] outline-none focus:border-[#00F3FF]"
+                        />
+                        <button type="submit" className="p-2 bg-[#00F3FF]/10 border border-[#00F3FF]/30 text-[#00F3FF]"><SearchIcon size={12}/></button>
+                     </form>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-3 border border-zinc-800 bg-zinc-900/30">
                         <div className="flex justify-between mb-2"><Cpu size={12}/><span className="text-[#00F3FF]">{sysStats.cpu}%</span></div>
@@ -269,22 +301,28 @@ export default function CyberPlayer({
                         <div className="h-1 bg-zinc-800"><div className="h-full bg-[#FF003C]" style={{ width: `${(sysStats.temp/100)*100}%` }} /></div>
                       </div>
                     </div>
-                    <div className="space-y-1 text-zinc-500 leading-relaxed uppercase">
-                      <div className="flex justify-between"><span>Neural_Uplink:</span><span className="text-white">Active</span></div>
-                      <div className="flex justify-between"><span>Encryption:</span><span className="text-white">AES-256</span></div>
-                      <div className="flex justify-between"><span>Bitrate:</span><span className="text-white">1411kbps</span></div>
-                    </div>
                   </div>
                 )}
                 {activeTab === 'queue' && (
                   <div className="space-y-2">
                     {playlist.map((track, i) => (
-                      <div key={track.id} onClick={() => onSelectTrack(track)} className={`flex items-center gap-3 p-2 border border-zinc-900 hover:border-[#00F3FF]/30 cursor-pointer transition-all ${currentTrack.id === track.id ? 'bg-[#00F3FF]/5 border-[#00F3FF]/50' : ''}`}>
-                        <span className="text-[8px] text-zinc-700">0{i+1}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] text-white uppercase truncate">{track.title}</div>
-                          <div className="text-[8px] text-zinc-600 uppercase">{track.artist}</div>
+                      <div key={track.id} className={`group flex items-center gap-3 p-2 border border-zinc-900 hover:border-[#00F3FF]/30 transition-all ${currentTrack.id === track.id ? 'bg-[#00F3FF]/5 border-[#00F3FF]/50' : ''}`}>
+                        <div className="flex-1 flex items-center gap-3 cursor-pointer" onClick={() => onSelectTrack(track)}>
+                            <span className="text-[8px] text-zinc-700">0{i+1}</span>
+                            <div className="min-w-0">
+                                <div className="text-[10px] text-white uppercase truncate">{track.title}</div>
+                                <div className="text-[8px] text-zinc-600 uppercase">{track.artist}</div>
+                            </div>
                         </div>
+                        {/* Remove Button (Only shows on hover) */}
+                        {onRemoveFromQueue && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onRemoveFromQueue(track.id); }}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-[#FF003C] transition-all"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -301,7 +339,7 @@ export default function CyberPlayer({
           </motion.div>
         )}
 
-        {/* --- FULLSCREEN (3-COLUMN ORIGINAL) --- */}
+        {/* --- FULLSCREEN (3-COLUMN) --- */}
         {viewMode === 'fullscreen' && (
           <motion.div
             key="fullscreen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -310,7 +348,7 @@ export default function CyberPlayer({
             <ScanLine />
             
             {/* Header */}
-            <div className="flex justify-between items-center mb-6 lg:mb-12">
+            <div className="flex justify-between items-center mb-6 lg:mb-12 border-b border-[#00F3FF]/20 pb-6">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 lg:w-12 lg:h-12 border-2 border-[#00F3FF] flex items-center justify-center animate-pulse"><Disc className="text-[#00F3FF]" /></div>
                 <div className="hidden sm:block">
@@ -318,6 +356,21 @@ export default function CyberPlayer({
                   <div className="text-[8px] lg:text-[10px] text-[#00F3FF] uppercase tracking-[0.4em] font-black">Secure_Audio_Uplink_Active</div>
                 </div>
               </div>
+              
+              {/* Central Search Bar */}
+              <div className="flex-1 max-w-xl mx-8 hidden md:block">
+                 <form onSubmit={handleLocalSearch} className="relative group">
+                     <input 
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="INJECT_DATA_QUERY..."
+                        className="w-full bg-black border border-zinc-800 p-3 pl-10 text-xs font-bold text-[#00F3FF] uppercase tracking-widest outline-none focus:border-[#00F3FF] transition-all"
+                     />
+                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-[#00F3FF]" size={16} />
+                 </form>
+              </div>
+
               <div className="flex gap-4">
                 <button onClick={() => setViewMode('card')} className="p-2 lg:p-4 border border-zinc-800 hover:border-[#00F3FF] transition-all"><Minimize2 size={24} lg:size={32}/></button>
                 <button onClick={() => setViewMode('dock')} className="p-2 lg:p-4 border border-zinc-800 hover:border-[#FF003C] hover:text-[#FF003C] transition-all"><X size={24} lg:size={32}/></button>
@@ -340,15 +393,31 @@ export default function CyberPlayer({
                     <div className="h-1 bg-zinc-800"><div className="h-full bg-[#FF003C] shadow-[0_0_10px_#FF003C]" style={{ width: `${(sysStats.temp/100)*100}%` }} /></div>
                   </div>
                 </div>
-                <div className="p-6 border border-zinc-800 bg-zinc-900/20 flex-1">
-                  <div className="flex items-center gap-3 text-pink-500 mb-6"><Activity size={20} /><span className="text-xs font-black uppercase tracking-widest">Network_Uplink</span></div>
-                  <div className="space-y-3 text-[9px] text-zinc-500 uppercase leading-relaxed">
-                    <div className="flex justify-between"><span>Status:</span><span className="text-white">Connected</span></div>
-                    <div className="flex justify-between"><span>Protocol:</span><span className="text-white">TCP/IP_V6</span></div>
-                    <div className="flex justify-between"><span>Packets:</span><span className="text-white">{sysStats.net} KB/S</span></div>
-                    <div className="flex justify-between"><span>Latency:</span><span className="text-white">12MS</span></div>
-                    <div className="flex justify-between"><span>Encryption:</span><span className="text-white">RSA_4096</span></div>
-                  </div>
+
+                {/* Queue in Column 1 */}
+                <div className="p-6 border border-zinc-800 bg-zinc-900/20 flex-1 overflow-hidden flex flex-col">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3 text-pink-500">
+                            <List size={20} />
+                            <span className="text-xs font-black uppercase tracking-widest">Active_Queue</span>
+                        </div>
+                        <span className="text-[10px] text-zinc-600">{playlist.length} NODES</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                        {playlist.map((track, i) => (
+                            <div key={track.id} className={`group flex items-center justify-between p-2 border border-zinc-900 hover:border-[#00F3FF]/30 transition-all ${currentTrack.id === track.id ? 'bg-[#00F3FF]/10 border-[#00F3FF]/50' : ''}`}>
+                                <div className="flex items-center gap-3 overflow-hidden cursor-pointer" onClick={() => onSelectTrack(track)}>
+                                    <span className="text-[9px] text-zinc-600 font-mono">{(i+1).toString().padStart(2, '0')}</span>
+                                    <span className="text-[10px] uppercase truncate text-zinc-400 group-hover:text-white transition-colors">{track.title}</span>
+                                </div>
+                                {onRemoveFromQueue && (
+                                    <button onClick={() => onRemoveFromQueue(track.id)} className="text-zinc-700 hover:text-[#FF003C] opacity-0 group-hover:opacity-100 transition-all">
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
               </div>
 
@@ -357,7 +426,10 @@ export default function CyberPlayer({
                 <div className="flex flex-col items-center text-center">
                   <div className="relative group mb-8 lg:mb-12">
                     <div className="absolute -inset-10 bg-[#00F3FF]/5 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-all duration-1000" />
-                    <img src={currentTrack.thumbnail} className={`${isMobile ? 'w-48 h-48' : 'w-80 h-80'} object-cover border-4 border-zinc-900 shadow-[0_0_80px_rgba(0,0,0,0.5)]`} alt="" />
+                    <div className="relative">
+                        <ScanLine /> {/* Overlay on album art */}
+                        <img src={currentTrack.thumbnail} className={`${isMobile ? 'w-48 h-48' : 'w-80 h-80'} object-cover border-4 border-zinc-900 shadow-[0_0_80px_rgba(0,0,0,0.5)]`} alt="" />
+                    </div>
                   </div>
                   <div className="text-[#FF003C] text-[10px] lg:text-xs font-black uppercase tracking-[0.5em] mb-4">Now_Playing_Stream</div>
                   <h2 className={`${isMobile ? 'text-2xl' : 'text-5xl lg:text-6xl'} font-black text-white uppercase tracking-tighter leading-tight mb-4`}>
@@ -372,14 +444,15 @@ export default function CyberPlayer({
                       <span>Neural_Sync_Progress</span>
                       <span className="text-[#00F3FF]">{Math.floor(progress)}%</span>
                     </div>
-                    <div className="h-2 bg-zinc-900 relative">
+                    <div className="h-2 bg-zinc-900 relative cursor-pointer group">
+                       {/* Interactive Progress Bar Placeholder - requires implementation in seek */}
                       <div className="h-full bg-[#00F3FF] shadow-[0_0_20px_#00F3FF]" style={{ width: `${progress}%` }} />
                     </div>
                   </div>
 
                   <div className="flex items-center justify-center gap-6 lg:gap-12">
                     <button onClick={onPrev} className="p-4 lg:p-6 border border-zinc-800 hover:border-[#00F3FF] transition-all"><SkipBack size={isMobile ? 24 : 40} /></button>
-                    <button onClick={onTogglePlay} className={`${isMobile ? 'w-20 h-20' : 'w-28 h-28'} rounded-full border-4 border-[#00F3FF] flex items-center justify-center hover:bg-[#00F3FF]/5 transition-all`}>
+                    <button onClick={onTogglePlay} className={`${isMobile ? 'w-20 h-20' : 'w-28 h-28'} rounded-full border-4 border-[#00F3FF] flex items-center justify-center hover:bg-[#00F3FF]/5 transition-all shadow-[0_0_30px_rgba(0,243,255,0.2)]`}>
                       {isPlaying ? <Pause size={isMobile ? 32 : 50} className="text-[#00F3FF]" /> : <Play size={isMobile ? 32 : 50} className={`text-[#00F3FF] fill-[#00F3FF] ${isMobile ? 'ml-2' : 'ml-4'}`} />}
                     </button>
                     <button onClick={onNext} className="p-4 lg:p-6 border border-zinc-800 hover:border-[#00F3FF] transition-all"><SkipForward size={isMobile ? 24 : 40} /></button>
@@ -395,8 +468,8 @@ export default function CyberPlayer({
                 </div>
                 <div className={`flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar ${isMobile ? 'h-64' : ''}`}>
                   {lyrics.map((line, i) => (
-                    <div key={i} className="text-[10px] text-zinc-500 hover:text-[#00F3FF] transition-colors leading-relaxed uppercase">
-                      <span className="text-[#00F3FF]/30 mr-3">[{i.toString().padStart(2, '0')}]</span>
+                    <div key={i} className="text-[10px] text-zinc-500 hover:text-[#00F3FF] transition-colors leading-relaxed uppercase font-mono">
+                      <span className="text-[#00F3FF]/30 mr-3 select-none">[{i.toString().padStart(2, '0')}]</span>
                       {line}
                     </div>
                   ))}

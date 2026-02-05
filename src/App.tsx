@@ -10,7 +10,7 @@ import CustomCursor from './components/CustomCursor';
 import type { Playlist, Track } from './types';
 import 'leaflet/dist/leaflet.css';
 
-const BACKEND_URL = "https://sua-url-do-render.onrender.com";
+const BACKEND_URL = "http://localhost:10000";
 
 declare global {
   interface Window {
@@ -23,10 +23,13 @@ export default function App() {
   const [isCarMode, setIsCarMode] = useState(false);
   const [showCarPrompt, setShowCarPrompt] = useState(false);
   const [searchTracks, setSearchTracks] = useState<Track[]>([]);
+  
+  // Persistência de Playlist
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>(() => {
     const saved = localStorage.getItem('pitwall_playlists');
     return saved ? JSON.parse(saved) : [];
   });
+
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
@@ -36,10 +39,12 @@ export default function App() {
   
   const playerRef = useRef<any>(null);
 
+  // Efeito para salvar playlists
   useEffect(() => {
     localStorage.setItem('pitwall_playlists', JSON.stringify(userPlaylists));
   }, [userPlaylists]);
 
+  // Efeito para atualizar título da janela (Estética)
   useEffect(() => {
     if (window.updateNeuralTitle) {
       if (currentTrack && isPlaying) {
@@ -50,20 +55,21 @@ export default function App() {
     }
   }, [currentTrack, isPlaying]);
 
+  // Busca na API
   const fetchYouTubeData = async (query: string): Promise<Track[]> => {
     if (!query || query.trim().length < 2) return [];
     setErrorMessage(null);
     
     try {
-      const response = await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
-      
+      const response = await fetch(`${BACKEND_URL}/api/music/search?q=${encodeURIComponent(query)}`);
       if (response.ok) {
         return await response.json();
       } else {
         throw new Error("SERVER_ERROR");
       }
     } catch (e) {
-      setErrorMessage("PROTOCOLO_DE_BUSCA_OFFLINE: O back-end no Render ainda está inicializando ou está fora do ar.");
+      console.error(e); 
+      setErrorMessage("PROTOCOLO_DE_BUSCA_OFFLINE: O back-end não respondeu na rota correta.");
       return [];
     }
   };
@@ -79,6 +85,8 @@ export default function App() {
       setIsSearching(false);
     }
   };
+
+  // --- CONTROLES DE PLAYER ---
 
   const playTrack = (track: Track, contextList: Track[]) => {
     setCurrentTrack(track);
@@ -100,63 +108,67 @@ export default function App() {
     if (currentIndex > 0) setCurrentTrack(playerQueue[currentIndex - 1]);
   };
 
+  // Funções Auxiliares para SinglePlaylist
+  const handleAddToQueue = (track: Track) => {
+    setPlayerQueue(prev => [...prev, track]);
+  };
+
+  const handlePlayNext = (track: Track) => {
+    if (!currentTrack) {
+        playTrack(track, [track]);
+        return;
+    }
+    const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
+    const newQueue = [...playerQueue];
+    // Insere logo após a música atual
+    newQueue.splice(currentIndex + 1, 0, track);
+    setPlayerQueue(newQueue);
+  };
+
+  const handleShufflePlay = (tracks: Track[]) => {
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+    if (shuffled.length > 0) {
+        playTrack(shuffled[0], shuffled);
+    }
+  };
+
   const activePlaylist = userPlaylists.find(pl => pl.id === activePlaylistId);
 
   return (
     <div className="flex h-screen bg-[#020202] text-white overflow-hidden font-mono h-[100dvh]">
       <CustomCursor />
 
+      {/* ERROR MODAL */}
       <AnimatePresence>
         {errorMessage && (
           <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
             className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <div className="border-2 border-red-500/50 bg-[#0a0000] p-6 max-w-md w-full relative">
               <div className="flex items-center gap-3 text-red-500 mb-4 font-bold uppercase tracking-tighter">
-                <span className="w-2 h-2 bg-red-500 animate-ping" />
-                Erro_Critico_de_Dados
+                <span className="w-2 h-2 bg-red-500 animate-ping" /> Erro_Critico_de_Dados
               </div>
-              <div className="text-zinc-400 text-[10px] mb-6 leading-relaxed uppercase">
-                {errorMessage}
-              </div>
-              <button 
-                onClick={() => setErrorMessage(null)} 
-                className="w-full border border-red-500/30 py-3 text-[10px] font-black uppercase hover:bg-red-500 transition-all"
-              >
-                Ignorar_Alerta
-              </button>
+              <div className="text-zinc-400 text-[10px] mb-6 leading-relaxed uppercase">{errorMessage}</div>
+              <button onClick={() => setErrorMessage(null)} className="w-full border border-red-500/30 py-3 text-[10px] font-black uppercase hover:bg-red-500 transition-all">Ignorar_Alerta</button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* CAR MODE PROMPT */}
       <AnimatePresence>
         {showCarPrompt && (
           <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
             className="fixed inset-0 z-[5000] bg-black/95 backdrop-blur-md flex items-center justify-center p-6"
           >
             <div className="border border-[#00F3FF] p-8 bg-[#020202] relative max-w-sm w-full">
               <div className="text-[#00F3FF] text-[10px] font-bold mb-2 uppercase tracking-[0.3em] animate-pulse">Auto_Detect: Landscape</div>
               <h2 className="text-xl font-black mb-8 uppercase italic leading-tight">Inicializar <span className="text-[#00F3FF]">Cyber_HUD</span>?</h2>
               <div className="flex gap-4">
-                <button 
-                  onClick={() => { setIsCarMode(true); setShowCarPrompt(false); }} 
-                  className="flex-1 bg-[#00F3FF] text-black py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-white transition-colors"
-                >
-                  Confirmar
-                </button>
-                <button 
-                  onClick={() => setShowCarPrompt(false)} 
-                  className="flex-1 border border-zinc-800 text-zinc-500 py-4 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-colors"
-                >
-                  Ignorar
-                </button>
+                <button onClick={() => { setIsCarMode(true); setShowCarPrompt(false); }} className="flex-1 bg-[#00F3FF] text-black py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-white transition-colors">Confirmar</button>
+                <button onClick={() => setShowCarPrompt(false)} className="flex-1 border border-zinc-800 text-zinc-500 py-4 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-colors">Ignorar</button>
               </div>
             </div>
           </motion.div>
@@ -211,6 +223,8 @@ export default function App() {
                   }} 
                 />
               )}
+              
+              {/* CORREÇÃO APLICADA AQUI: Adicionadas as props obrigatórias */}
               {view === 'single-playlist' && activePlaylist && (
                 <SinglePlaylist 
                   playlist={activePlaylist} 
@@ -220,6 +234,14 @@ export default function App() {
                   onAddTrack={(plId: string, t: Track) => {
                     setUserPlaylists(prev => prev.map(pl => pl.id === plId ? { ...pl, tracks: [...pl.tracks, t] } : pl));
                   }}
+                  onRemoveTrack={(plId: string, trackId: string) => {
+                    setUserPlaylists(prev => prev.map(pl => 
+                       pl.id === plId ? { ...pl, tracks: pl.tracks.filter(t => t.id !== trackId) } : pl
+                    ));
+                  }}
+                  onQueueTrack={handleAddToQueue}
+                  onPlayNext={handlePlayNext}
+                  onShufflePlay={handleShufflePlay}
                 />
               )}
             </div>

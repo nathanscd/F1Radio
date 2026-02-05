@@ -138,3 +138,68 @@
     cursor: auto !important;
   }
 }
+
+/* CYBERPUNK CORE STYLES */
+.cyber-hud-container {
+  font-family: 'Orbitron', monospace;
+  background-color: #050505;
+  color: #00F3FF;
+  overflow: hidden;
+}
+
+/* Efeito de Scanline CRT */
+.scanlines {
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0) 50%,
+    rgba(0,0,0,0.2) 50%,
+    rgba(0,0,0,0.2)
+  );
+  background-size: 100% 4px;
+  position: absolute; inset: 0; pointer-events: none; z-index: 9000;
+  opacity: 0.15;
+}
+
+/* Glitch Animation */
+@keyframes glitch-skew {
+  0% { transform: skew(0deg); }
+  20% { transform: skew(-2deg); }
+  40% { transform: skew(2deg); }
+  60% { transform: skew(0deg); }
+}
+.glitch-text { animation: glitch-skew 3s infinite linear alternate-reverse; }
+
+/* Map 3D Perspective */
+.map-3d-wrapper {
+  perspective: 1200px;
+  height: 100%; width: 100%;
+  background: #000;
+}
+.map-tilted {
+  transform: rotateX(45deg) scale(1.4);
+  transform-origin: center 80%;
+  transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  filter: contrast(1.3) brightness(0.9) hue-rotate(180deg) invert(1) saturate(0.5);
+}
+.map-flat {
+  transform: rotateX(0);
+  transition: transform 0.8s ease;
+  filter: invert(1) hue-rotate(180deg) brightness(0.7) contrast(1.2);
+}
+
+/* Navigation Line Pulse */
+.nav-line-pulse {
+  animation: dash 1s linear infinite;
+}
+
+/* Custom Leaflet overrides */
+.leaflet-container { background: #000 !important; }
+.leaflet-popup-content-wrapper { 
+  background: rgba(0, 10, 20, 0.95); 
+  border: 1px solid #00F3FF; 
+  border-radius: 0;
+  color: #fff;
+  font-family: 'Orbitron';
+}
+.leaflet-popup-tip { background: #00F3FF; }
