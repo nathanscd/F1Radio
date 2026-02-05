@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
-import Home from './pages/Home';
+import Home from './pages/Home'; 
 import Playlists from './pages/Playlists';
 import SinglePlaylist from './pages/SinglePlaylist';
 import F1RadioPlayer from './components/Player';
@@ -10,7 +10,7 @@ import CustomCursor from './components/CustomCursor';
 import type { Playlist, Track } from './types';
 import 'leaflet/dist/leaflet.css';
 
-const BACKEND_URL = "https://f1radio.onrender.com";
+const BACKEND_URL = "https://f1radio.onrender.com"; 
 
 declare global {
   interface Window {
@@ -22,6 +22,8 @@ export default function App() {
   const [view, setView] = useState<'home' | 'playlists' | 'single-playlist'>('home');
   const [isCarMode, setIsCarMode] = useState(false);
   const [showCarPrompt, setShowCarPrompt] = useState(false);
+  
+  // Estado principal de músicas buscadas (Agora virão filtradas do backend)
   const [searchTracks, setSearchTracks] = useState<Track[]>([]);
   
   // Persistência de Playlist
@@ -44,7 +46,7 @@ export default function App() {
     localStorage.setItem('pitwall_playlists', JSON.stringify(userPlaylists));
   }, [userPlaylists]);
 
-  // Efeito para atualizar título da janela (Estética)
+  // Efeito para atualizar título da janela
   useEffect(() => {
     if (window.updateNeuralTitle) {
       if (currentTrack && isPlaying) {
@@ -55,21 +57,26 @@ export default function App() {
     }
   }, [currentTrack, isPlaying]);
 
-  // Busca na API
+  // --- BUSCA NA API (Consumindo o Backend Inteligente) ---
   const fetchYouTubeData = async (query: string): Promise<Track[]> => {
     if (!query || query.trim().length < 2) return [];
     setErrorMessage(null);
     
     try {
+      // O Backend agora cuida de:
+      // 1. Filtrar Categoria 10 (Música)
+      // 2. Verificar duração > 60s (Remover Shorts)
       const response = await fetch(`${BACKEND_URL}/api/music/search?q=${encodeURIComponent(query)}`);
+      
       if (response.ok) {
-        return await response.json();
+        const data = await response.json();
+        return data;
       } else {
         throw new Error("SERVER_ERROR");
       }
     } catch (e) {
       console.error(e); 
-      setErrorMessage("PROTOCOLO_DE_BUSCA_OFFLINE: O back-end não respondeu na rota correta.");
+      setErrorMessage("ERRO_CONEXAO: Falha ao acessar o banco de dados neural.");
       return [];
     }
   };
@@ -80,7 +87,13 @@ export default function App() {
     try {
       const tracks = await fetchYouTubeData(query);
       setSearchTracks(tracks);
+      
       if (!isCarMode && tracks.length > 0) setView('home');
+      
+      if (tracks.length === 0) {
+          setErrorMessage("NENHUM_RESULTADO_COMPATIVEL: Tente outra frequência.");
+          setTimeout(() => setErrorMessage(null), 3000);
+      }
     } finally {
       setIsSearching(false);
     }
@@ -108,7 +121,7 @@ export default function App() {
     if (currentIndex > 0) setCurrentTrack(playerQueue[currentIndex - 1]);
   };
 
-  // Funções Auxiliares para SinglePlaylist
+  // Funções Auxiliares
   const handleAddToQueue = (track: Track) => {
     setPlayerQueue(prev => [...prev, track]);
   };
@@ -120,7 +133,6 @@ export default function App() {
     }
     const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
     const newQueue = [...playerQueue];
-    // Insere logo após a música atual
     newQueue.splice(currentIndex + 1, 0, track);
     setPlayerQueue(newQueue);
   };
@@ -147,10 +159,10 @@ export default function App() {
           >
             <div className="border-2 border-red-500/50 bg-[#0a0000] p-6 max-w-md w-full relative">
               <div className="flex items-center gap-3 text-red-500 mb-4 font-bold uppercase tracking-tighter">
-                <span className="w-2 h-2 bg-red-500 animate-ping" /> Erro_Critico_de_Dados
+                <span className="w-2 h-2 bg-red-500 animate-ping" /> Erro_Critico
               </div>
               <div className="text-zinc-400 text-[10px] mb-6 leading-relaxed uppercase">{errorMessage}</div>
-              <button onClick={() => setErrorMessage(null)} className="w-full border border-red-500/30 py-3 text-[10px] font-black uppercase hover:bg-red-500 transition-all">Ignorar_Alerta</button>
+              <button onClick={() => setErrorMessage(null)} className="w-full border border-red-500/30 py-3 text-[10px] font-black uppercase hover:bg-red-500 transition-all">Ignorar</button>
             </div>
           </motion.div>
         )}
@@ -199,6 +211,8 @@ export default function App() {
           <main className="flex-1 overflow-y-auto bg-[#050505] relative custom-scrollbar">
             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00F3FF]/5 via-transparent to-transparent pointer-events-none" />
             <div className="relative z-10">
+              
+              {/* HOME COM LÓGICA DE ÁLBUNS E ARTISTAS */}
               {view === 'home' && (
                 <Home 
                   playlist={searchTracks} 
@@ -212,6 +226,7 @@ export default function App() {
                   }}
                 />
               )}
+
               {view === 'playlists' && (
                 <Playlists 
                   playlists={userPlaylists} 
@@ -224,7 +239,6 @@ export default function App() {
                 />
               )}
               
-              {/* CORREÇÃO APLICADA AQUI: Adicionadas as props obrigatórias */}
               {view === 'single-playlist' && activePlaylist && (
                 <SinglePlaylist 
                   playlist={activePlaylist} 
@@ -249,6 +263,7 @@ export default function App() {
         </>
       )}
 
+      {/* BARRA DE PLAYER INFERIOR */}
       <div className={isCarMode ? "hidden pointer-events-none" : ""}>
         <F1RadioPlayer 
           currentTrack={currentTrack || { id: '', title: 'SYSTEM_IDLE', artist: 'NULL', thumbnail: '' }}
