@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
 import Home from './pages/Home'; 
 import Playlists from './pages/Playlists';
 import SinglePlaylist from './pages/SinglePlaylist';
-import F1RadioPlayer from './components/Player';
+import CyberPlayer from './components/Player';
 import CyberCarMode from './components/CarMode';
 import CustomCursor from './components/CustomCursor';
 import type { Playlist, Track } from './types';
@@ -22,11 +22,7 @@ export default function App() {
   const [view, setView] = useState<'home' | 'playlists' | 'single-playlist'>('home');
   const [isCarMode, setIsCarMode] = useState(false);
   const [showCarPrompt, setShowCarPrompt] = useState(false);
-  
-  // Estado principal de músicas buscadas (Agora virão filtradas do backend)
   const [searchTracks, setSearchTracks] = useState<Track[]>([]);
-  
-  // Persistência de Playlist
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>(() => {
     const saved = localStorage.getItem('pitwall_playlists');
     return saved ? JSON.parse(saved) : [];
@@ -41,12 +37,10 @@ export default function App() {
   
   const playerRef = useRef<any>(null);
 
-  // Efeito para salvar playlists
   useEffect(() => {
     localStorage.setItem('pitwall_playlists', JSON.stringify(userPlaylists));
   }, [userPlaylists]);
 
-  // Efeito para atualizar título da janela
   useEffect(() => {
     if (window.updateNeuralTitle) {
       if (currentTrack && isPlaying) {
@@ -57,17 +51,11 @@ export default function App() {
     }
   }, [currentTrack, isPlaying]);
 
-  // --- BUSCA NA API (Consumindo o Backend Inteligente) ---
   const fetchYouTubeData = async (query: string): Promise<Track[]> => {
     if (!query || query.trim().length < 2) return [];
     setErrorMessage(null);
-    
     try {
-      // O Backend agora cuida de:
-      // 1. Filtrar Categoria 10 (Música)
-      // 2. Verificar duração > 60s (Remover Shorts)
       const response = await fetch(`${BACKEND_URL}/api/music/search?q=${encodeURIComponent(query)}`);
-      
       if (response.ok) {
         const data = await response.json();
         return data;
@@ -87,9 +75,7 @@ export default function App() {
     try {
       const tracks = await fetchYouTubeData(query);
       setSearchTracks(tracks);
-      
       if (!isCarMode && tracks.length > 0) setView('home');
-      
       if (tracks.length === 0) {
           setErrorMessage("NENHUM_RESULTADO_COMPATIVEL: Tente outra frequência.");
           setTimeout(() => setErrorMessage(null), 3000);
@@ -99,50 +85,49 @@ export default function App() {
     }
   };
 
-  // --- CONTROLES DE PLAYER ---
-
-  const playTrack = (track: Track, contextList: Track[]) => {
+  const playTrack = useCallback((track: Track, contextList: Track[]) => {
     setCurrentTrack(track);
     setPlayerQueue(contextList);
     setIsPlaying(true);
-  };
+  }, []);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (!currentTrack || playerQueue.length === 0) return;
     const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
     if (currentIndex !== -1 && currentIndex < playerQueue.length - 1) {
       setCurrentTrack(playerQueue[currentIndex + 1]);
     }
-  };
+  }, [currentTrack, playerQueue]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (!currentTrack || playerQueue.length === 0) return;
     const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
     if (currentIndex > 0) setCurrentTrack(playerQueue[currentIndex - 1]);
-  };
+  }, [currentTrack, playerQueue]);
 
-  // Funções Auxiliares
-  const handleAddToQueue = (track: Track) => {
+  const handleAddToQueue = useCallback((track: Track) => {
     setPlayerQueue(prev => [...prev, track]);
-  };
+  }, []);
 
-  const handlePlayNext = (track: Track) => {
+  const handlePlayNext = useCallback((track: Track) => {
     if (!currentTrack) {
         playTrack(track, [track]);
         return;
     }
     const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
-    const newQueue = [...playerQueue];
-    newQueue.splice(currentIndex + 1, 0, track);
-    setPlayerQueue(newQueue);
-  };
+    setPlayerQueue(prev => {
+        const newQueue = [...prev];
+        newQueue.splice(currentIndex + 1, 0, track);
+        return newQueue;
+    });
+  }, [currentTrack, playerQueue, playTrack]);
 
-  const handleShufflePlay = (tracks: Track[]) => {
+  const handleShufflePlay = useCallback((tracks: Track[]) => {
     const shuffled = [...tracks].sort(() => Math.random() - 0.5);
     if (shuffled.length > 0) {
         playTrack(shuffled[0], shuffled);
     }
-  };
+  }, [playTrack]);
 
   const activePlaylist = userPlaylists.find(pl => pl.id === activePlaylistId);
 
@@ -150,7 +135,6 @@ export default function App() {
     <div className="flex h-screen bg-[#020202] text-white overflow-hidden font-mono h-[100dvh]">
       <CustomCursor />
 
-      {/* ERROR MODAL */}
       <AnimatePresence>
         {errorMessage && (
           <motion.div 
@@ -168,7 +152,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* CAR MODE PROMPT */}
       <AnimatePresence>
         {showCarPrompt && (
           <motion.div 
@@ -212,7 +195,6 @@ export default function App() {
             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00F3FF]/5 via-transparent to-transparent pointer-events-none" />
             <div className="relative z-10">
               
-              {/* HOME COM LÓGICA DE ÁLBUNS E ARTISTAS */}
               {view === 'home' && (
                 <Home 
                   playlist={searchTracks} 
@@ -250,7 +232,7 @@ export default function App() {
                   }}
                   onRemoveTrack={(plId: string, trackId: string) => {
                     setUserPlaylists(prev => prev.map(pl => 
-                       pl.id === plId ? { ...pl, tracks: pl.tracks.filter(t => t.id !== trackId) } : pl
+                        pl.id === plId ? { ...pl, tracks: pl.tracks.filter(t => t.id !== trackId) } : pl
                     ));
                   }}
                   onQueueTrack={handleAddToQueue}
@@ -263,9 +245,8 @@ export default function App() {
         </>
       )}
 
-      {/* BARRA DE PLAYER INFERIOR */}
       <div className={isCarMode ? "hidden pointer-events-none" : ""}>
-        <F1RadioPlayer 
+        <CyberPlayer 
           currentTrack={currentTrack || { id: '', title: 'SYSTEM_IDLE', artist: 'NULL', thumbnail: '' }}
           isPlaying={isPlaying}
           onTogglePlay={() => setIsPlaying(!isPlaying)}
@@ -274,7 +255,6 @@ export default function App() {
           playlist={playerQueue}
           onPlayerReady={(p: any) => playerRef.current = p}
           onStateChange={(state: number) => {
-              if (state === 0) handleNext();
               if (state === 1) setIsPlaying(true);
               if (state === 2) setIsPlaying(false);
           }}
