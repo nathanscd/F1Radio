@@ -6,7 +6,6 @@ import {
   Terminal, Cpu, Disc, Radio, Search, X, ChevronUp
 } from 'lucide-react';
 
-/* --- TIPAGEM --- */
 declare global { 
   interface Window { 
     onYouTubeIframeAPIReady: () => void; 
@@ -48,8 +47,6 @@ const CLIPS = {
   CHAMFER: "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)",
   CHAMFER_BTN: "polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px)",
 };
-
-/* --- SUB-COMPONENTS --- */
 
 const GlitchText = ({ text, active }: { text: string, active: boolean }) => (
   <div className="relative inline-block truncate max-w-full">
@@ -120,42 +117,31 @@ const QuickSearch = ({ onSearch, onClose }: { onSearch: (q: string) => void, onC
   );
 };
 
-/* --- MAIN COMPONENT --- */
-
 export default function CyberPlayer({ 
   currentTrack, isPlaying, onTogglePlay, onNext, onPrev, 
   playlist, onPlayerReady, onStateChange, onSearch
 }: CyberPlayerProps) {
   
-  /* Estados Visuais */
   const [viewMode, setViewMode] = useState<'mini' | 'medium' | 'full'>('mini');
   const [showSearch, setShowSearch] = useState(false);
   const [glitchTrigger, setGlitchTrigger] = useState(false);
-  
-  /* Estados de Áudio */
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
-
-  /* Estados de Device */
   const [isMobile, setIsMobile] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
-  // forcePortrait: true = mostra Mini Player mesmo estando em landscape
   const [forcePortrait, setForcePortrait] = useState(false); 
   
-  /* Refs para Lógica */
   const playerRef = useRef<any>(null);
   const progressInterval = useRef<any>(null);
+  const watchdogInterval = useRef<any>(null);
 
-  /* Refs para Callbacks (Stale Closure Fix) */
   const onNextRef = useRef(onNext);
   const onPrevRef = useRef(onPrev);
   const onTogglePlayRef = useRef(onTogglePlay);
   const onStateChangeRef = useRef(onStateChange);
-
-  /* --- EFFECTS --- */
 
   useEffect(() => {
     onNextRef.current = onNext;
@@ -164,19 +150,13 @@ export default function CyberPlayer({
     onStateChangeRef.current = onStateChange;
   }, [onNext, onPrev, onTogglePlay, onStateChange]);
 
-  // Detecção de Layout
   useEffect(() => {
     const check = () => {
         const mobile = window.innerWidth < 1024;
         const land = window.innerWidth > window.innerHeight && mobile;
-        
         setIsMobile(mobile);
         setIsLandscape(land);
-        
-        // Se girou para portrait, reseta o estado de força
         if (!land) setForcePortrait(false);
-
-        // Se for mobile e estiver em medium, forçar mini (correção de bug)
         if (mobile && !land) {
             setViewMode(prev => prev === 'medium' ? 'mini' : prev);
         }
@@ -186,7 +166,6 @@ export default function CyberPlayer({
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Glitch
   useEffect(() => {
     const timer = setInterval(() => {
       setGlitchTrigger(true);
@@ -195,7 +174,6 @@ export default function CyberPlayer({
     return () => clearInterval(timer);
   }, []);
 
-  // Media Session (Background)
   useEffect(() => {
     if ('mediaSession' in navigator && currentTrack.id) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -203,14 +181,43 @@ export default function CyberPlayer({
         artist: currentTrack.artist,
         artwork: [{ src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' }]
       });
-      navigator.mediaSession.setActionHandler('play', () => onTogglePlayRef.current());
+      navigator.mediaSession.setActionHandler('play', () => {
+         onTogglePlayRef.current();
+         if(playerRef.current) playerRef.current.playVideo();
+      });
       navigator.mediaSession.setActionHandler('pause', () => onTogglePlayRef.current());
       navigator.mediaSession.setActionHandler('previoustrack', () => onPrevRef.current());
       navigator.mediaSession.setActionHandler('nexttrack', () => onNextRef.current());
     }
   }, [currentTrack]);
 
-  // Init Player
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isPlaying && playerRef.current) {
+         setTimeout(() => {
+             playerRef.current.playVideo();
+         }, 100);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (watchdogInterval.current) clearInterval(watchdogInterval.current);
+    if (isPlaying) {
+      watchdogInterval.current = setInterval(() => {
+        if (playerRef.current && typeof playerRef.current.getPlayerState === 'function') {
+          const ytState = playerRef.current.getPlayerState();
+          if (ytState === 2 || ytState === 5) {
+            playerRef.current.playVideo();
+          }
+        }
+      }, 1000);
+    }
+    return () => clearInterval(watchdogInterval.current);
+  }, [isPlaying]);
+
   useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -221,8 +228,6 @@ export default function CyberPlayer({
       initializePlayer();
     }
   }, []);
-
-  /* --- LOGIC --- */
 
   const initializePlayer = () => {
     if (playerRef.current) return;
@@ -242,7 +247,7 @@ export default function CyberPlayer({
         },
         onStateChange: (e: any) => {
           if (onStateChangeRef.current) onStateChangeRef.current(e.data);
-          if(e.data === 0 && onNextRef.current) onNextRef.current(); 
+          if(e.data === 0 && onNextRef.current) onNextRef.current();
         }
       }
     });
@@ -311,37 +316,28 @@ export default function CyberPlayer({
     return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Lógica de Expansão Inteligente
   const handleMiniPlayerClick = () => {
     if (isMobile) {
         if (isLandscape) {
-            // Se estiver deitado, força o Deck Mode e garante que não está minimizado
             setForcePortrait(false); 
         } else {
-            // Se estiver em pé, abre o Fullscreen padrão
             setViewMode('full');
         }
     } else {
-        // Desktop
         setViewMode('medium');
     }
   };
 
-  // CSS dinâmico para o Mini Player (esconde ou diminui em landscape)
   const getMiniPlayerClasses = () => {
     if (isMobile) {
         if (isLandscape && forcePortrait) {
-             // Landscape mas usuário minimizou o deck: mostra mini player pequeno no canto
              return "bottom-4 right-4 w-80 border border-[#00F3FF]/40 rounded-sm bg-[#020202]";
         }
-        // Portrait padrão: barra inferior full width
         return "bottom-0 left-0 w-full border-t border-[#00F3FF]/40 bg-[#020202]";
     }
-    // Desktop: widget flutuante
     return "bottom-8 right-8 w-80 border border-[#00F3FF]/40 bg-[#020202]";
   };
 
-  /* --- RENDER --- */
   return (
     <>
       <div className="fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none z-[-1] overflow-hidden">
@@ -358,16 +354,11 @@ export default function CyberPlayer({
         .animate-noise { animation: noise 0.2s steps(5) infinite; }
       `}</style>
 
-      {/* =========================================================================
-             MOBILE LANDSCAPE (DECK MODE) - PRIORIDADE MÁXIMA
-             Só aparece se estiver Mobile + Landscape + NÃO estiver minimizado (forcePortrait)
-         ========================================================================= */}
       {isMobile && isLandscape && !forcePortrait ? (
         <motion.div 
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           className="fixed inset-0 z-[600] bg-[#020202] flex p-4 gap-6 overflow-hidden border-[4px] border-[#00F3FF]/20"
         >
-          {/* Botão de Minimizar: Sai do Deck Mode e volta pro Mini Player */}
           <button 
             onClick={() => {
                 setForcePortrait(true);
@@ -378,7 +369,6 @@ export default function CyberPlayer({
             <Minimize2 size={24} />
           </button>
 
-          {/* Left: Art */}
           <div className="w-1/3 h-full relative border border-[#00F3FF]/40 bg-black/50 overflow-hidden">
              <img src={currentTrack.thumbnail} className="w-full h-full object-cover opacity-60" alt="" />
              <div className="absolute inset-0 flex items-center justify-center">
@@ -389,7 +379,6 @@ export default function CyberPlayer({
              {glitchTrigger && <div className="absolute inset-0 bg-[#00F3FF]/20 animate-noise mix-blend-screen" />}
           </div>
 
-          {/* Right: Controls */}
           <div className="flex-1 flex flex-col justify-between py-2">
              <div>
                 <div className="flex items-center gap-2 text-[#FF003C] text-[10px] font-black uppercase tracking-widest mb-1">
@@ -427,9 +416,6 @@ export default function CyberPlayer({
         </motion.div>
       ) : (
       
-      /* =========================================================================
-                           STANDARD PLAYERS CONTAINER
-         ========================================================================= */
       <AnimatePresence mode="wait">
         <motion.div
           key="unified-player"
@@ -441,18 +427,15 @@ export default function CyberPlayer({
           `}
           style={{ clipPath: viewMode === 'full' ? 'none' : CLIPS.CHAMFER }}
         >
-          {/* Quick Search Overlay */}
           <AnimatePresence>
             {showSearch && <QuickSearch onSearch={onSearch} onClose={() => setShowSearch(false)} />}
           </AnimatePresence>
 
-          {/* Background FX */}
           <div className="absolute inset-0 pointer-events-none">
              <div className="absolute inset-0 opacity-10 bg-[linear-gradient(0deg,transparent_24%,#00F3FF_25%,#00F3FF_26%,transparent_27%,transparent_74%,#00F3FF_75%,#00F3FF_76%,transparent_77%,transparent),linear-gradient(90deg,transparent_24%,#00F3FF_25%,#00F3FF_26%,transparent_27%,transparent_74%,#00F3FF_75%,#00F3FF_76%,transparent_77%,transparent)] bg-[size:50px_50px]" />
              {glitchTrigger && viewMode === 'mini' && <div className="absolute inset-0 bg-[#00F3FF]/20 animate-noise mix-blend-screen" />}
           </div>
 
-          {/* --- MINI PLAYER (Sempre Visível se não estiver Full) --- */}
           {viewMode === 'mini' && (
             <div className="w-full h-full flex items-center p-4 gap-4 relative" onClick={handleMiniPlayerClick}>
                <div className="h-12 w-12 md:h-16 md:w-16 bg-zinc-900 relative shrink-0">
@@ -474,7 +457,6 @@ export default function CyberPlayer({
                   <button onClick={onTogglePlay} className="w-10 h-10 bg-[#00F3FF]/10 border border-[#00F3FF] flex items-center justify-center text-[#00F3FF] hover:bg-[#00F3FF] hover:text-black transition-colors rounded-full md:rounded-none">
                      {isPlaying ? <Pause size={16} fill="currentColor"/> : <Play size={16} fill="currentColor"/>}
                   </button>
-                  {/* Ícone Indicador de Expandir (Apenas Visual) */}
                   <div className="text-zinc-500 hover:text-[#00F3FF] pointer-events-none">
                       <ChevronUp size={20} />
                   </div>
@@ -482,7 +464,6 @@ export default function CyberPlayer({
             </div>
           )}
 
-          {/* --- MEDIUM PLAYER (DESKTOP ONLY) --- */}
           {viewMode === 'medium' && !isMobile && (
             <div className="w-full h-full flex flex-col relative">
                <div className="h-10 border-b border-[#00F3FF]/20 flex items-center justify-between px-4 bg-[#00F3FF]/5">
@@ -530,7 +511,6 @@ export default function CyberPlayer({
             </div>
           )}
 
-          {/* --- FULLSCREEN PLAYER (PORTRAIT MOBILE & DESKTOP) --- */}
           {viewMode === 'full' && (
             <div className="w-full h-full flex flex-col p-4 lg:p-8 relative bg-black">
                <div className="flex justify-between items-center mb-8 border-b border-[#00F3FF]/20 pb-4">
@@ -543,7 +523,6 @@ export default function CyberPlayer({
                   </div>
                   <div className="flex gap-4">
                     <button onClick={() => setShowSearch(!showSearch)} className="p-3 border border-zinc-800 hover:border-[#00F3FF] hover:text-[#00F3FF] text-zinc-500 transition-all"><Search size={24}/></button>
-                    {/* Botão de Fechar */}
                     <button onClick={() => setViewMode(isMobile ? 'mini' : 'medium')} className="p-3 border border-zinc-800 hover:border-[#FF003C] hover:text-[#FF003C] text-zinc-500 transition-all">
                        {isMobile ? <ChevronDown size={24} /> : <Minimize2 size={24} />}
                     </button>
@@ -551,7 +530,6 @@ export default function CyberPlayer({
                </div>
                
                <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 overflow-y-auto lg:overflow-visible custom-scrollbar pb-10 lg:pb-0">
-                  {/* Left Column (Desktop Only) */}
                   <div className="hidden lg:flex lg:col-span-3 flex-col gap-6">
                      <div className="aspect-square relative border border-[#00F3FF]/30 p-2">
                         <img src={currentTrack.thumbnail} className="w-full h-full object-cover grayscale opacity-80" alt="" />
@@ -567,7 +545,6 @@ export default function CyberPlayer({
                      </div>
                   </div>
                   
-                  {/* Center Column (Controls) */}
                   <div className="lg:col-span-6 flex flex-col justify-center items-center relative py-6">
                      <div className="lg:hidden w-64 h-64 mb-8 border border-[#00F3FF]/30 p-1 relative shadow-[0_0_30px_rgba(0,243,255,0.1)]">
                         <img src={currentTrack.thumbnail} className="w-full h-full object-cover" alt="" />
@@ -603,7 +580,6 @@ export default function CyberPlayer({
                      )}
                   </div>
                   
-                  {/* Right Column (Lyrics - Desktop) */}
                   <div className="lg:col-span-3 border-l border-[#00F3FF]/10 pl-6 flex flex-col h-full min-h-0 hidden lg:flex">
                      <div className="flex items-center gap-2 text-[#00F3FF] mb-4 border-b border-[#00F3FF]/20 pb-2"><Terminal size={16} /> <span className="text-xs font-black uppercase tracking-widest">Lyric_Stream_v1</span></div>
                      <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-xs space-y-4 pr-2">

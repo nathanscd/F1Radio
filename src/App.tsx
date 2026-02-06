@@ -11,7 +11,6 @@ import type { Playlist, Track } from './types';
 import 'leaflet/dist/leaflet.css';
 
 const BACKEND_URL = "https://f1radio.onrender.com"; 
-
 const SILENT_AUDIO = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
 declare global {
@@ -24,14 +23,11 @@ export default function App() {
   const [view, setView] = useState<'home' | 'playlists' | 'single-playlist'>('home');
   const [isCarMode, setIsCarMode] = useState(false);
   const [showCarPrompt, setShowCarPrompt] = useState(false);
-  
   const [searchTracks, setSearchTracks] = useState<Track[]>([]);
-  
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>(() => {
     const saved = localStorage.getItem('pitwall_playlists');
     return saved ? JSON.parse(saved) : [];
   });
-
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
@@ -57,22 +53,16 @@ export default function App() {
     }
   }, [currentTrack, isPlaying]);
 
-  useEffect(() => {
-    if (silentAudioRef.current) {
-      if (isPlaying) {
-        silentAudioRef.current.play().catch(() => {});
-      } else {
-        silentAudioRef.current.pause();
-      }
+  const enableBackgroundAudio = useCallback(() => {
+    if (silentAudioRef.current && silentAudioRef.current.paused) {
+      silentAudioRef.current.play().catch(() => {});
     }
-  }, [isPlaying]);
+  }, []);
 
   const fetchYouTubeData = useCallback(async (query: string): Promise<Track[]> => {
     if (!query || query.trim().length < 2) return [];
-    
     try {
       const response = await fetch(`${BACKEND_URL}/api/music/search?q=${encodeURIComponent(query)}`);
-      
       if (response.ok) {
         const data = await response.json();
         return data;
@@ -92,9 +82,7 @@ export default function App() {
     try {
       const tracks = await fetchYouTubeData(query);
       setSearchTracks(tracks);
-      
       if (!isCarMode && tracks.length > 0) setView('home');
-      
       if (tracks.length === 0) {
           setErrorMessage("NENHUM_RESULTADO_COMPATIVEL: Tente outra frequência.");
           setTimeout(() => setErrorMessage(null), 3000);
@@ -107,35 +95,31 @@ export default function App() {
   };
 
   const playTrack = useCallback((track: Track, contextList: Track[]) => {
+    enableBackgroundAudio();
     setCurrentTrack(track);
     setPlayerQueue([...contextList]);
     setIsPlaying(true);
     setRadioMode(false);
-  }, []);
+  }, [enableBackgroundAudio]);
 
   const handleNext = useCallback(async () => {
     if (!currentTrack || playerQueue.length === 0) return;
-
     const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
 
     if (currentIndex !== -1 && currentIndex < playerQueue.length - 1) {
       setCurrentTrack(playerQueue[currentIndex + 1]);
-    } 
-    else {
+    } else {
       setRadioMode(true);
       const seedTrack = currentTrack;
-      
       const variations = [
         `${seedTrack.artist} similar songs`,
         `${seedTrack.artist} mix`,
         `Songs like ${seedTrack.title} ${seedTrack.artist}`
       ];
-      
       const randomQuery = variations[Math.floor(Math.random() * variations.length)];
 
       try {
         const newRecommendations = await fetchYouTubeData(randomQuery);
-        
         const uniqueTracks = newRecommendations.filter(rec => 
             !playerQueue.some(existing => existing.id === rec.id)
         );
@@ -146,9 +130,7 @@ export default function App() {
         } else {
             setCurrentTrack(playerQueue[0]);
         }
-
       } catch (error) {
-        console.error(error);
         setCurrentTrack(playerQueue[0]);
       }
     }
@@ -187,7 +169,11 @@ export default function App() {
   const activePlaylist = userPlaylists.find(pl => pl.id === activePlaylistId);
 
   return (
-    <div className="flex h-screen bg-[#020202] text-white overflow-hidden font-mono h-[100dvh]">
+    <div 
+      className="flex h-screen bg-[#020202] text-white overflow-hidden font-mono h-[100dvh]"
+      onClick={enableBackgroundAudio}
+      onTouchStart={enableBackgroundAudio}
+    >
       <CustomCursor />
       
       <audio 
@@ -323,7 +309,7 @@ export default function App() {
           currentTrack={currentTrack || { id: '', title: 'SYSTEM_IDLE', artist: 'NULL', thumbnail: '' }}
           isPlaying={isPlaying}
           onTogglePlay={() => setIsPlaying(!isPlaying)}
-          onNext={handleNext}
+          onNext={handleNext} 
           onPrev={handlePrev}
           playlist={playerQueue}
           onPlayerReady={(p: any) => playerRef.current = p}
