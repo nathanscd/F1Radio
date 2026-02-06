@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import Home from './pages/Home'; 
 import Playlists from './pages/Playlists';
 import SinglePlaylist from './pages/SinglePlaylist';
-import CyberPlayer from './components/Player';
+import CyberPlayer from './components/CyberPlayer';
 import CyberCarMode from './components/CarMode';
 import CustomCursor from './components/CustomCursor';
 import type { Playlist, Track } from './types';

@@ -1,379 +1,445 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Shield, Database, 
-  Mic2, Layers, Filter, User, Music, 
-  Play, Server, Activity
-} from 'lucide-react';
-import DetailModal from '../components/DetailModal'; 
-import type { Track, Playlist } from '../types';
-
-interface Album {
-  id: string;
-  title: string;
-  artist: string;
-  cover: string;
-  tracks: Track[];
-  year: string;
-  genre: string;
-}
-
-interface Artist {
-  id: string;
-  name: string;
-  image: string;
-  topTracks: Track[];
-  bio: string;
-  listeners: string;
-}
+import React, { useState, useEffect } from 'react';
+import { Settings, ShieldCheck, User, Zap, Radio, Navigation, Gauge, Wifi, Signal, Battery, Clock } from 'lucide-react';
+import { motion } from 'framer-motion';
+import ClockWeather from '../components/dashboard/ClockWeather';
+import QuickActions from '../components/dashboard/QuickActions';
 
 interface HomeProps {
-  playlist: Track[];
-  currentTrack: Track;
-  isPlaying: boolean;
-  onSelectTrack: (track: Track) => void;
-  onSearch: (query: string) => void;
-  userPlaylists: Playlist[];
-  onAddToPlaylist: (id: string, track: Track) => void;
+  onNavigate: (page: string) => void;
+  userName?: string;
 }
 
-const GENRES = ["CYBERPUNK_CORE", "SYNTHWAVE", "DARK_TECHNO", "NEURAL_BASS", "INDUSTRIAL"];
-const BIOS = [
-  "Originating from the neon-lit sectors of Neo-Tokyo, this unit specializes in auditory neural stimulation.",
-  "A rogue AI construct that gained sentience through low-frequency bass waves. Wanted in 12 systems.",
-  "Legendary sound architect known for hacking corporate frequencies to broadcast underground resistance anthems.",
-  "Data stream corrupted... Retreiving backup... Artist profile consists of high-energy kinetic audio files."
-];
+export default function Home({ onNavigate, userName = "..." }: HomeProps) {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [batteryLevel, setBatteryLevel] = useState(100);
+  const [signalStrength, setSignalStrength] = useState(95);
 
-const deriveData = (tracks: Track[]) => {
-  const albumsMap = new Map<string, Album>();
-  const artistsMap = new Map<string, Artist>();
-
-  tracks.forEach(t => {
-    const albumKey = `${t.artist}-${t.thumbnail}`; 
-    if (!albumsMap.has(albumKey)) {
-      albumsMap.set(albumKey, {
-        id: `alb-${Math.random().toString(36).substr(2, 9)}`,
-        title: t.title.replace(/(\(Official Video\)|\(Audio\)|\(Lyrics\)|\[Official Video\])/gi, '').trim(), 
-        artist: t.artist,
-        cover: t.thumbnail,
-        tracks: [],
-        year: (2077 - Math.floor(Math.random() * 50)).toString(),
-        genre: GENRES[Math.floor(Math.random() * GENRES.length)]
-      });
-    }
-    albumsMap.get(albumKey)?.tracks.push(t);
-
-    // 2. Artistas Virtuais
-    if (!artistsMap.has(t.artist)) {
-      artistsMap.set(t.artist, {
-        id: `art-${t.artist.replace(/\s/g, '')}`,
-        name: t.artist,
-        image: t.thumbnail,
-        topTracks: [],
-        bio: BIOS[Math.floor(Math.random() * BIOS.length)],
-        listeners: (Math.floor(Math.random() * 500) + 100).toString() + "M"
-      });
-    }
-    artistsMap.get(t.artist)?.topTracks.push(t);
-  });
-
-  return {
-    albums: Array.from(albumsMap.values()),
-    artists: Array.from(artistsMap.values())
-  };
-};
-
-/* --- UI COMPONENTS (MINI) --- */
-
-const CRTOverlay = () => (
-  <div className="fixed inset-0 pointer-events-none z-[50] overflow-hidden h-screen w-screen">
-    <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[size:100%_2px,3px_100%]" />
-  </div>
-);
-
-const HackerText = ({ text, className }: { text: string, className?: string }) => {
-  const [displayed, setDisplayed] = useState('');
   useEffect(() => {
-    let i = 0;
-    const t = setInterval(() => {
-      setDisplayed(text.substring(0, i));
-      i++;
-      if (i > text.length) clearInterval(t);
-    }, 20);
-    return () => clearInterval(t);
-  }, [text]);
-  return <span className={className}>{displayed}<span className="animate-pulse">_</span></span>;
-};
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-const EntityCard = ({ 
-  title, subtitle, image, type, onClick 
-}: { title: string, subtitle: string, image: string, type: 'ALBUM' | 'ARTIST', onClick: () => void }) => (
-  <motion.div 
-    whileHover={{ y: -8, boxShadow: '0 10px 30px -10px rgba(0, 243, 255, 0.3)' }}
-    onClick={onClick}
-    className="group relative border border-[#004444] bg-[#050505] cursor-pointer overflow-hidden flex flex-col h-full rounded-sm"
-  >
-    <div className="aspect-square overflow-hidden relative border-b border-[#004444]">
-      <img src={image} className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${type === 'ARTIST' ? 'grayscale group-hover:grayscale-0' : ''}`} alt="" />
-      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-all" />
-      <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/80 backdrop-blur-md border border-[#00F3FF]/50 text-[8px] font-bold text-[#00F3FF]">
-        {type}
-      </div>
-      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-        <div className="w-12 h-12 rounded-full bg-[#00F3FF] flex items-center justify-center text-black shadow-[0_0_20px_#00F3FF]">
-            <Play size={20} fill="currentColor" />
-        </div>
-      </div>
-    </div>
-    <div className="p-4 bg-[#050505] group-hover:bg-[#00F3FF]/5 transition-colors flex-1 flex flex-col justify-center relative">
-      <div className="absolute top-0 left-0 w-0 h-[2px] bg-[#00F3FF] group-hover:w-full transition-all duration-500" />
-      <h3 className="font-bold text-white truncate text-sm group-hover:text-[#00F3FF] uppercase tracking-wide">{title}</h3>
-      <p className="text-[10px] text-[#008888] truncate uppercase font-mono mt-1">{subtitle}</p>
-    </div>
-  </motion.div>
-);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
-/* --- MAIN PAGE COMPONENT --- */
+    if ((navigator as any).getBattery) {
+      (navigator as any).getBattery().then((batt: any) => {
+        setBatteryLevel(Math.round(batt.level * 100));
+        batt.addEventListener('levelchange', () => setBatteryLevel(Math.round(batt.level * 100)));
+      }).catch(() => {});
+    }
 
-export default function Home({ 
-  playlist, currentTrack, isPlaying, onSelectTrack, 
-  onSearch, userPlaylists, onAddToPlaylist 
-}: HomeProps) {
-  
-  // State
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'ALL' | 'TRACKS' | 'ALBUMS' | 'ARTISTS'>('ALL');
-  const [selectedItem, setSelectedItem] = useState<{ type: 'album' | 'artist', data: any } | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
-  // Derived Data (Memoized)
-  const { albums, artists } = useMemo(() => deriveData(playlist), [playlist]);
-
-  // Filtering Logic
-  const filteredData = useMemo(() => {
-    const q = query.toLowerCase();
-    
-    const tracks = playlist.filter(t => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q));
-    const filAlbums = albums.filter(a => a.title.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q));
-    const filArtists = artists.filter(a => a.name.toLowerCase().includes(q));
-
-    return { tracks, albums: filAlbums, artists: filArtists };
-  }, [query, playlist, albums, artists]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    setTimeout(() => {
-        onSearch(query);
-        setIsProcessing(false);
-    }, 800);
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
   };
 
-  const openModal = (type: 'album' | 'artist', data: any) => setSelectedItem({ type, data });
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: "easeOut" },
+    },
+  };
+
+  const glitchVariants = {
+    animate: {
+      textShadow: [
+        "0 0 10px #00F3FF, 0 0 20px #00F3FF",
+        "0 0 20px #FF003C, 0 0 40px #FF003C",
+        "0 0 10px #00F3FF, 0 0 20px #00F3FF",
+      ],
+      transition: { duration: 3, repeat: Infinity },
+    },
+  };
 
   return (
-    <div className="min-h-screen bg-[#020202] text-[#00F3FF] font-mono relative overflow-x-hidden selection:bg-[#00F3FF] selection:text-black pb-32">
-      <CRTOverlay />
-      
-      {/* Background Grid */}
-      <div className="fixed inset-0 bg-[linear-gradient(to_right,#00F3FF05_1px,transparent_1px),linear-gradient(to_bottom,#00F3FF05_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-
-      {/* HEADER */}
-      <header className="p-6 md:p-8 border-b border-[#00F3FF]/20 bg-[#020202]/90 backdrop-blur-md sticky top-0 z-40 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-         <div className="max-w-[1600px] mx-auto">
-             <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-6">
-                 <div>
-                     <div className="flex items-center gap-2 text-xs text-[#008888] mb-2 animate-pulse">
-                         <Shield size={12} /> SECURE_NETRUNNER_UPLINK_V4.5
-                     </div>
-                     <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white drop-shadow-[2px_2px_0_#00F3FF]">
-                         Cyber_Hub
-                     </h1>
-                 </div>
-                 
-                 <div className="hidden md:flex gap-4 text-[10px] font-mono text-[#005555]">
-                     <div className="border border-[#004444] px-3 py-1 bg-black flex gap-2"><span>MEM:</span> <span className="text-[#00F3FF]">64TB</span></div>
-                     <div className="border border-[#004444] px-3 py-1 bg-black flex gap-2"><span>NET:</span> <span className="text-[#00F3FF]">5G/s</span></div>
-                 </div>
-             </div>
-
-             {/* SEARCH */}
-             <div className="w-full bg-[#001010] border border-[#004444] p-4 relative shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-                 <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4 relative z-10">
-                     <div className="flex-1 relative group">
-                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                             <span className="text-[#00F3FF] font-bold animate-pulse">{'>'}</span>
-                         </div>
-                         <input 
-                             type="text" 
-                             value={query}
-                             onChange={(e) => setQuery(e.target.value)}
-                             placeholder="EXECUTE_SEARCH_QUERY..."
-                             className="w-full bg-black border border-[#00F3FF]/30 py-3 pl-8 pr-4 text-sm font-bold text-[#00F3FF] placeholder-[#004444] focus:border-[#00F3FF] focus:shadow-[0_0_20px_rgba(0,243,255,0.2)] outline-none transition-all uppercase"
-                         />
-                     </div>
-                     
-                     <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
-                         {['ALL', 'TRACKS', 'ALBUMS', 'ARTISTS'].map((f) => (
-                             <button
-                                 key={f}
-                                 type="button"
-                                 onClick={() => setFilter(f as any)}
-                                 className={`px-4 py-2 text-xs font-bold uppercase border transition-all flex items-center gap-2 whitespace-nowrap ${filter === f ? 'bg-[#00F3FF] text-black border-[#00F3FF] shadow-[0_0_15px_rgba(0,243,255,0.4)]' : 'bg-black text-[#005555] border-[#004444] hover:border-[#00F3FF] hover:text-[#00F3FF]'}`}
-                             >
-                                 <Filter size={10} /> {f}
-                             </button>
-                         ))}
-                     </div>
-                 </form>
-                 
-                 {isProcessing && (
-                     <motion.div 
-                        initial={{ width: "0%" }} animate={{ width: "100%" }}
-                        transition={{ duration: 0.8 }}
-                        className="absolute bottom-0 left-0 h-[2px] bg-[#00F3FF] shadow-[0_0_10px_#00F3FF]"
-                     />
-                 )}
-             </div>
-         </div>
-      </header>
-
-      {/* --- CONTENT --- */}
-      <main className="max-w-[1600px] mx-auto p-6 md:p-8">
-        
-        {/* DETAIL MODAL (Chamado aqui) */}
-        <AnimatePresence>
-            {selectedItem && (
-                <DetailModal 
-                    item={selectedItem.data} 
-                    type={selectedItem.type} 
-                    allAlbums={albums}
-                    onClose={() => setSelectedItem(null)} 
-                    onPlay={(t) => onSelectTrack(t)}
-                    onAddToPlaylist={userPlaylists.length > 0 ? (t) => onAddToPlaylist(userPlaylists[0].id, t) : undefined}
-                />
-            )}
-        </AnimatePresence>
-
-        {isProcessing ? (
-            <div className="h-64 flex items-center justify-center text-[#00F3FF]">
-                <div className="flex flex-col items-center">
-                    <Activity size={48} className="animate-bounce mb-4" />
-                    <HackerText text="ACCESSING_MAINFRAME_DATABASE..." className="text-xl font-bold tracking-widest" />
-                </div>
-            </div>
-        ) : (
-            <>
-                {/* 1. ARTISTS */}
-                {(filter === 'ALL' || filter === 'ARTISTS') && filteredData.artists.length > 0 && (
-                    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-12">
-                        <div className="flex items-center justify-between border-b border-[#00F3FF]/30 pb-2 mb-6 mt-4">
-                           <div className="flex items-center gap-3">
-                              <div className="p-1 bg-[#00F3FF]/10 border border-[#00F3FF]"><User size={16} /></div>
-                              <h2 className="text-xl font-bold tracking-widest uppercase text-white">Neural_Links [Artists]</h2>
-                           </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                            {filteredData.artists.slice(0, 12).map((artist, i) => (
-                                <EntityCard 
-                                    key={artist.id}
-                                    title={artist.name} 
-                                    subtitle="ARTIST_PROFILE" 
-                                    image={artist.image} 
-                                    type="ARTIST" 
-                                    onClick={() => openModal('artist', artist)} 
-                                />
-                            ))}
-                        </div>
-                    </motion.section>
-                )}
-
-                {/* 2. ALBUMS */}
-                {(filter === 'ALL' || filter === 'ALBUMS') && filteredData.albums.length > 0 && (
-                    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-12">
-                        <div className="flex items-center justify-between border-b border-[#00F3FF]/30 pb-2 mb-6">
-                           <div className="flex items-center gap-3">
-                              <div className="p-1 bg-[#00F3FF]/10 border border-[#00F3FF]"><Layers size={16} /></div>
-                              <h2 className="text-xl font-bold tracking-widest uppercase text-white">Data_Archives [Albums]</h2>
-                           </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                            {filteredData.albums.slice(0, 10).map((album, i) => (
-                                <EntityCard 
-                                    key={album.id}
-                                    title={album.title} 
-                                    subtitle={album.artist} 
-                                    image={album.cover} 
-                                    type="ALBUM" 
-                                    onClick={() => openModal('album', album)} 
-                                />
-                            ))}
-                        </div>
-                    </motion.section>
-                )}
-
-                {/* 3. TRACKS */}
-                {(filter === 'ALL' || filter === 'TRACKS') && filteredData.tracks.length > 0 && (
-                    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-12">
-                        <div className="flex items-center justify-between border-b border-[#00F3FF]/30 pb-2 mb-6">
-                           <div className="flex items-center gap-3">
-                              <div className="p-1 bg-[#00F3FF]/10 border border-[#00F3FF]"><Music size={16} /></div>
-                              <h2 className="text-xl font-bold tracking-widest uppercase text-white">Audio_Streams [Tracks]</h2>
-                           </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredData.tracks.map((track, i) => (
-                                <motion.div 
-                                    key={track.id}
-                                    className={`relative flex items-center gap-4 p-3 border transition-all cursor-pointer group ${currentTrack.id === track.id ? 'bg-[#00F3FF]/10 border-[#00F3FF]' : 'bg-black border-[#004444] hover:border-[#00F3FF]/50'}`}
-                                    onClick={() => onSelectTrack(track)}
-                                >
-                                    <div className="w-16 h-16 relative overflow-hidden shrink-0 border border-[#004444]">
-                                        <img src={track.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Play size={20} className="text-[#00F3FF]" />
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-white truncate text-sm group-hover:text-[#00F3FF] uppercase">{track.title}</h4>
-                                        <p className="text-xs text-[#008888] truncate">{track.artist}</p>
-                                    </div>
-
-                                    <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (userPlaylists.length > 0) onAddToPlaylist(userPlaylists[0].id, track);
-                                        }}
-                                        className="p-2 text-[#004444] hover:text-[#00F3FF] transition-colors"
-                                    >
-                                        <Server size={16} />
-                                    </button>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </motion.section>
-                )}
-
-                {/* EMPTY STATE */}
-                {!isProcessing && filteredData.tracks.length === 0 && (
-                    <div className="py-20 text-center border border-dashed border-[#004444] text-[#005555] bg-[#001010]/50 mt-12">
-                        <Shield size={48} className="mx-auto mb-4 opacity-50" />
-                        <div className="text-lg font-bold">NO_DATA_FOUND_IN_SECTOR</div>
-                        <div className="text-xs mt-2 uppercase tracking-widest">TRY_ADJUSTING_QUERY_PARAMETERS</div>
-                    </div>
-                )}
-            </>
-        )}
-      </main>
-      
+    <div className="min-h-screen bg-gradient-to-br from-[#000000] via-[#050b14] to-[#0a0f1a] p-6 flex flex-col justify-between overflow-hidden relative font-mono">
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #000; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #004444; border-radius: 2px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #00F3FF; }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        .font-cyber { font-family: 'Orbitron', monospace; }
+        
+        .glass-panel {
+          background: rgba(0, 5, 10, 0.7);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(0, 243, 255, 0.15);
+        }
+        
+        .glass-panel-dark {
+          background: rgba(0, 0, 0, 0.8);
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(0, 243, 255, 0.1);
+        }
+        
+        .neon-border {
+          border: 1px solid rgba(0, 243, 255, 0.3);
+          box-shadow: 0 0 20px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(0, 243, 255, 0.05);
+        }
+        
+        .neon-border-pink {
+          border: 1px solid rgba(255, 0, 60, 0.3);
+          box-shadow: 0 0 20px rgba(255, 0, 60, 0.2), inset 0 0 20px rgba(255, 0, 60, 0.05);
+        }
+        
+        .glow-cyan {
+          filter: drop-shadow(0 0 8px #00F3FF) drop-shadow(0 0 4px #00F3FF);
+        }
+        
+        .glow-pink {
+          filter: drop-shadow(0 0 8px #FF003C) drop-shadow(0 0 4px #FF003C);
+        }
+        
+        @keyframes scan {
+          0%, 100% { transform: translateY(-100%); }
+          50% { transform: translateY(100vh); }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.05); }
+          50% { box-shadow: 0 0 40px rgba(0, 243, 255, 0.6), inset 0 0 30px rgba(0, 243, 255, 0.1); }
+        }
+        
+        @keyframes grid-move {
+          0% { background-position: 0 0; }
+          100% { background-position: 40px 40px; }
+        }
+        
+        .animate-scan {
+          animation: scan 8s linear infinite;
+        }
+        
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        
+        .animate-pulse-glow {
+          animation: pulse-glow 3s ease-in-out infinite;
+        }
+        
+        .grid-bg {
+          background-image: 
+            linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+          background-size: 40px 40px;
+          animation: grid-move 20s linear infinite;
+        }
+        
+        .cyber-text {
+          background: linear-gradient(135deg, #00F3FF, #FF003C, #00F3FF);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        
+        .button-hover {
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .button-hover::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.3), transparent);
+          transition: left 0.5s;
+        }
+        
+        .button-hover:hover::before {
+          left: 100%;
+        }
+        
+        .button-hover:hover {
+          box-shadow: 0 0 20px rgba(0, 243, 255, 0.5), inset 0 0 20px rgba(0, 243, 255, 0.1);
+          border-color: rgba(0, 243, 255, 0.6);
+        }
       `}</style>
+
+      {/* Background FX - Enhanced */}
+      <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-[#00F3FF]/8 blur-[150px] rounded-full pointer-events-none animate-pulse" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-pink-500/8 blur-[130px] rounded-full pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#00F3FF]/3 blur-[200px] rounded-full pointer-events-none opacity-20" />
+      
+      {/* Grid Background */}
+      <div className="absolute inset-0 grid-bg opacity-30 pointer-events-none" />
+
+      {/* Animated Border Top */}
+      <motion.div
+        className="fixed inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-[#00F3FF] to-transparent z-0"
+        animate={{
+          boxShadow: [
+            "0 0 20px rgba(0, 243, 255, 0.5)",
+            "0 0 40px rgba(0, 243, 255, 0.8)",
+            "0 0 20px rgba(0, 243, 255, 0.5)",
+          ],
+        }}
+        transition={{ duration: 2, repeat: Infinity }}
+      />
+
+      {/* Decorative Corner Borders - Enhanced */}
+      <motion.div
+        className="fixed top-6 left-6 w-10 h-10 border-t-2 border-l-2 border-[#00F3FF]/40 rounded-tl-xl pointer-events-none"
+        animate={{
+          boxShadow: [
+            "0 0 10px rgba(0, 243, 255, 0.3)",
+            "0 0 20px rgba(0, 243, 255, 0.6)",
+            "0 0 10px rgba(0, 243, 255, 0.3)",
+          ],
+        }}
+        transition={{ duration: 2, repeat: Infinity }}
+      />
+      <motion.div
+        className="fixed bottom-6 right-6 w-10 h-10 border-b-2 border-r-2 border-[#00F3FF]/40 rounded-br-xl pointer-events-none"
+        animate={{
+          boxShadow: [
+            "0 0 10px rgba(0, 243, 255, 0.3)",
+            "0 0 20px rgba(0, 243, 255, 0.6)",
+            "0 0 10px rgba(0, 243, 255, 0.3)",
+          ],
+        }}
+        transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+      />
+
+      {/* Header Section - Enhanced */}
+      <motion.header
+        className="z-10 flex justify-between items-start"
+        variants={itemVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <div className="flex-1">
+          <ClockWeather />
+        </div>
+        <div className="flex gap-3">
+          {/* Status Indicators */}
+          <motion.div
+            className="glass-panel px-4 py-2.5 rounded-xl flex items-center gap-3 neon-border"
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <div className="flex items-center gap-2">
+              <Signal size={14} className={`${isOnline ? 'text-green-400' : 'text-red-400'} animate-pulse`} />
+              <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+            </div>
+            <div className="w-px h-4 bg-white/10" />
+            <div className="flex items-center gap-2">
+              <Battery size={14} className={`${batteryLevel > 50 ? 'text-green-400' : batteryLevel > 20 ? 'text-yellow-400' : 'text-red-400'}`} />
+              <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">{batteryLevel}%</span>
+            </div>
+          </motion.div>
+
+          <motion.button
+            className="glass-panel p-2.5 rounded-xl border-white/5 button-hover neon-border"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onNavigate('settings')}
+          >
+            <Settings size={20} className="text-[#00F3FF]" />
+          </motion.button>
+        </div>
+      </motion.header>
+
+      {/* Main Greeting / Profile Section - Enhanced */}
+      <motion.main
+        className="z-10 flex flex-col gap-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Profile Card */}
+        <motion.div
+          className="flex items-center gap-6"
+          variants={itemVariants}
+        >
+          <motion.div
+            className="w-20 h-20 rounded-2xl neon-border flex items-center justify-center bg-gradient-to-br from-[#00F3FF]/20 to-black relative flex-shrink-0 animate-pulse-glow"
+            whileHover={{ scale: 1.05 }}
+          >
+            <User size={40} className="text-[#00F3FF] glow-cyan" />
+            <motion.div
+              className="absolute -bottom-2 -right-2 p-1.5 bg-green-500 rounded-full border-2 border-[#050b14] shadow-lg"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <ShieldCheck size={12} className="text-black" />
+            </motion.div>
+          </motion.div>
+
+          <div className="flex-1">
+            <motion.h2
+              className="text-4xl lg:text-5xl font-black text-white uppercase italic tracking-tighter font-cyber leading-none mb-2"
+              variants={glitchVariants}
+              animate="animate"
+            >
+              {greeting}, <span className="cyber-text">{userName}</span>
+            </motion.h2>
+            <motion.div
+              className="flex items-center gap-3 mt-3"
+              variants={itemVariants}
+            >
+              <motion.div
+                className="h-2 w-2 rounded-full bg-green-400 shadow-lg"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+              <span className="text-[9px] text-zinc-400 font-black uppercase tracking-[0.3em]">SISTEMAS ONLINE</span>
+              <div className="h-px w-8 bg-gradient-to-r from-green-400 to-transparent" />
+              <span className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.3em]">STATUS: OPERACIONAL</span>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Info Cards Grid */}
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          variants={containerVariants}
+        >
+          {/* Traffic Status */}
+          <motion.div
+            className="glass-panel p-4 rounded-xl neon-border overflow-hidden relative group"
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00F3FF]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <Navigation size={14} className="text-[#00F3FF]" />
+                <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest">TRÁFEGO</span>
+              </div>
+              <p className="text-[11px] text-zinc-300 font-bold leading-relaxed">
+                Rota para <span className="text-[#00F3FF] font-black">Eletra Energy</span> fluindo normalmente
+              </p>
+            </div>
+          </motion.div>
+
+          {/* System Status */}
+          <motion.div
+            className="glass-panel p-4 rounded-xl neon-border overflow-hidden relative group"
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00F3FF]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap size={14} className="text-yellow-400" />
+                <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest">ENERGIA</span>
+              </div>
+              <p className="text-[11px] text-zinc-300 font-bold">
+                Consumo em <span className="text-yellow-400 font-black">NORMAL</span>
+              </p>
+              <div className="w-full h-1.5 bg-white/5 rounded mt-2 overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-yellow-400 to-[#00F3FF]"
+                  animate={{ width: ['0%', '75%', '75%'] }}
+                  transition={{ duration: 2, delay: 0.5 }}
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Signal Strength */}
+          <motion.div
+            className="glass-panel p-4 rounded-xl neon-border overflow-hidden relative group"
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00F3FF]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <Radio size={14} className="text-pink-400" />
+                <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest">SINAL</span>
+              </div>
+              <p className="text-[11px] text-zinc-300 font-bold">
+                Força: <span className="text-pink-400 font-black">{signalStrength}%</span>
+              </p>
+              <div className="flex gap-1 mt-2">
+                {[...Array(5)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className={`h-1 flex-1 rounded ${i < Math.ceil((signalStrength / 100) * 5) ? 'bg-pink-400' : 'bg-white/10'}`}
+                    animate={i < Math.ceil((signalStrength / 100) * 5) ? { opacity: [0.5, 1, 0.5] } : {}}
+                    transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Main Alert Box - Enhanced */}
+        <motion.div
+          className="glass-panel p-6 rounded-xl bg-gradient-to-r from-black/60 via-[#00F3FF]/5 to-transparent neon-border overflow-hidden relative group"
+          variants={itemVariants}
+          whileHover={{ scale: 1.01 }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-[#00F3FF]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <motion.div
+            className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#00F3FF] to-transparent"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <div className="relative z-10">
+            <div className="flex items-start gap-3 mb-2">
+              <motion.div
+                className="w-2 h-2 rounded-full bg-[#00F3FF] mt-1 flex-shrink-0"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+              <span className="text-[9px] text-[#00F3FF] font-black uppercase tracking-[0.2em]">SISTEMA NEURAL</span>
+            </div>
+            <p className="text-[12px] text-zinc-300 font-bold leading-relaxed tracking-wide">
+              Sugestão: O trânsito para <span className="text-white font-black">Eletra Energy</span> está fluindo normalmente. Tempo estimado: <span className="text-[#00F3FF]">18 minutos</span>. Modo foco recomendado.
+            </p>
+          </div>
+        </motion.div>
+      </motion.main>
+
+      {/* Footer / Quick Access - Enhanced */}
+      <motion.footer
+        className="z-10 pb-4"
+        variants={itemVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <div className="flex items-center gap-4 mb-6">
+          <motion.span
+            className="text-[8px] font-black text-[#00F3FF] uppercase tracking-[0.4em] whitespace-nowrap font-cyber"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            ▸ LAUNCHER CENTRAL
+          </motion.span>
+          <motion.div
+            className="h-[1px] w-full bg-gradient-to-r from-[#00F3FF]/40 via-[#00F3FF]/10 to-transparent"
+            animate={{ opacity: [0.3, 0.8, 0.3] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
+        </div>
+        <QuickActions onNavigate={onNavigate} />
+      </motion.footer>
     </div>
   );
 }
