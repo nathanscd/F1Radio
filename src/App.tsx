@@ -12,6 +12,8 @@ import 'leaflet/dist/leaflet.css';
 
 const BACKEND_URL = "https://f1radio.onrender.com"; 
 
+const SILENT_AUDIO = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+
 declare global {
   interface Window {
     updateNeuralTitle: (title: string, artist: string) => void;
@@ -22,7 +24,9 @@ export default function App() {
   const [view, setView] = useState<'home' | 'playlists' | 'single-playlist'>('home');
   const [isCarMode, setIsCarMode] = useState(false);
   const [showCarPrompt, setShowCarPrompt] = useState(false);
+  
   const [searchTracks, setSearchTracks] = useState<Track[]>([]);
+  
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>(() => {
     const saved = localStorage.getItem('pitwall_playlists');
     return saved ? JSON.parse(saved) : [];
@@ -34,7 +38,9 @@ export default function App() {
   const [playerQueue, setPlayerQueue] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [radioMode, setRadioMode] = useState(false);
   
+  const silentAudioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -51,11 +57,22 @@ export default function App() {
     }
   }, [currentTrack, isPlaying]);
 
-  const fetchYouTubeData = async (query: string): Promise<Track[]> => {
+  useEffect(() => {
+    if (silentAudioRef.current) {
+      if (isPlaying) {
+        silentAudioRef.current.play().catch(() => {});
+      } else {
+        silentAudioRef.current.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  const fetchYouTubeData = useCallback(async (query: string): Promise<Track[]> => {
     if (!query || query.trim().length < 2) return [];
-    setErrorMessage(null);
+    
     try {
       const response = await fetch(`${BACKEND_URL}/api/music/search?q=${encodeURIComponent(query)}`);
+      
       if (response.ok) {
         const data = await response.json();
         return data;
@@ -64,22 +81,26 @@ export default function App() {
       }
     } catch (e) {
       console.error(e); 
-      setErrorMessage("ERRO_CONEXAO: Falha ao acessar o banco de dados neural.");
       return [];
     }
-  };
+  }, []);
 
   const handleGlobalSearch = async (query: string) => {
     if (!query) return;
     setIsSearching(true);
+    setErrorMessage(null);
     try {
       const tracks = await fetchYouTubeData(query);
       setSearchTracks(tracks);
+      
       if (!isCarMode && tracks.length > 0) setView('home');
+      
       if (tracks.length === 0) {
           setErrorMessage("NENHUM_RESULTADO_COMPATIVEL: Tente outra frequência.");
           setTimeout(() => setErrorMessage(null), 3000);
       }
+    } catch (err) {
+      setErrorMessage("ERRO_CONEXAO: Falha ao acessar o banco de dados neural.");
     } finally {
       setIsSearching(false);
     }
@@ -87,17 +108,51 @@ export default function App() {
 
   const playTrack = useCallback((track: Track, contextList: Track[]) => {
     setCurrentTrack(track);
-    setPlayerQueue(contextList);
+    setPlayerQueue([...contextList]);
     setIsPlaying(true);
+    setRadioMode(false);
   }, []);
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     if (!currentTrack || playerQueue.length === 0) return;
+
     const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
+
     if (currentIndex !== -1 && currentIndex < playerQueue.length - 1) {
       setCurrentTrack(playerQueue[currentIndex + 1]);
+    } 
+    else {
+      setRadioMode(true);
+      const seedTrack = currentTrack;
+      
+      const variations = [
+        `${seedTrack.artist} similar songs`,
+        `${seedTrack.artist} mix`,
+        `Songs like ${seedTrack.title} ${seedTrack.artist}`
+      ];
+      
+      const randomQuery = variations[Math.floor(Math.random() * variations.length)];
+
+      try {
+        const newRecommendations = await fetchYouTubeData(randomQuery);
+        
+        const uniqueTracks = newRecommendations.filter(rec => 
+            !playerQueue.some(existing => existing.id === rec.id)
+        );
+
+        if (uniqueTracks.length > 0) {
+            setPlayerQueue(prev => [...prev, ...uniqueTracks]);
+            setCurrentTrack(uniqueTracks[0]);
+        } else {
+            setCurrentTrack(playerQueue[0]);
+        }
+
+      } catch (error) {
+        console.error(error);
+        setCurrentTrack(playerQueue[0]);
+      }
     }
-  }, [currentTrack, playerQueue]);
+  }, [currentTrack, playerQueue, fetchYouTubeData]);
 
   const handlePrev = useCallback(() => {
     if (!currentTrack || playerQueue.length === 0) return;
@@ -134,21 +189,39 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#020202] text-white overflow-hidden font-mono h-[100dvh]">
       <CustomCursor />
+      
+      <audio 
+        ref={silentAudioRef} 
+        src={SILENT_AUDIO} 
+        loop 
+        playsInline 
+        className="hidden" 
+      />
 
       <AnimatePresence>
         {errorMessage && (
           <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} 
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] bg-[#0a0000] border border-red-500/50 p-4 shadow-[0_0_20px_rgba(255,0,0,0.2)]"
           >
-            <div className="border-2 border-red-500/50 bg-[#0a0000] p-6 max-w-md w-full relative">
-              <div className="flex items-center gap-3 text-red-500 mb-4 font-bold uppercase tracking-tighter">
-                <span className="w-2 h-2 bg-red-500 animate-ping" /> Erro_Critico
-              </div>
-              <div className="text-zinc-400 text-[10px] mb-6 leading-relaxed uppercase">{errorMessage}</div>
-              <button onClick={() => setErrorMessage(null)} className="w-full border border-red-500/30 py-3 text-[10px] font-black uppercase hover:bg-red-500 transition-all">Ignorar</button>
+            <div className="flex items-center gap-3 text-red-500 font-bold uppercase tracking-tighter text-xs">
+              <span className="w-2 h-2 bg-red-500 animate-ping rounded-full" /> {errorMessage}
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <AnimatePresence>
+        {radioMode && (
+             <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed top-20 right-4 z-[400] pointer-events-none"
+             >
+                <div className="flex items-center gap-2 px-3 py-1 bg-[#00F3FF]/10 border border-[#00F3FF]/30 rounded-full backdrop-blur-md">
+                    <div className="w-1.5 h-1.5 bg-[#00F3FF] animate-pulse rounded-full"/>
+                    <span className="text-[9px] text-[#00F3FF] uppercase tracking-widest">Radio_Link_Active</span>
+                </div>
+             </motion.div>
         )}
       </AnimatePresence>
 
@@ -193,7 +266,7 @@ export default function App() {
           />
           <main className="flex-1 overflow-y-auto bg-[#050505] relative custom-scrollbar">
             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#00F3FF]/5 via-transparent to-transparent pointer-events-none" />
-            <div className="relative z-10">
+            <div className="relative z-10 pb-24 md:pb-0"> 
               
               {view === 'home' && (
                 <Home 
@@ -259,7 +332,7 @@ export default function App() {
               if (state === 2) setIsPlaying(false);
           }}
           onSearch={handleGlobalSearch}
-          onSelectTrack={(t: Track) => playTrack(t, searchTracks)}
+          onSelectTrack={(t: Track) => playTrack(t, [t])}
         />
       </div>
     </div>
