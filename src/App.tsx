@@ -23,11 +23,14 @@ export default function App() {
   const [view, setView] = useState<'home' | 'playlists' | 'single-playlist'>('home');
   const [isCarMode, setIsCarMode] = useState(false);
   const [showCarPrompt, setShowCarPrompt] = useState(false);
+  
   const [searchTracks, setSearchTracks] = useState<Track[]>([]);
+  
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>(() => {
     const saved = localStorage.getItem('pitwall_playlists');
     return saved ? JSON.parse(saved) : [];
   });
+
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
@@ -82,7 +85,9 @@ export default function App() {
     try {
       const tracks = await fetchYouTubeData(query);
       setSearchTracks(tracks);
+      
       if (!isCarMode && tracks.length > 0) setView('home');
+      
       if (tracks.length === 0) {
           setErrorMessage("NENHUM_RESULTADO_COMPATIVEL: Tente outra frequência.");
           setTimeout(() => setErrorMessage(null), 3000);
@@ -104,11 +109,13 @@ export default function App() {
 
   const handleNext = useCallback(async () => {
     if (!currentTrack || playerQueue.length === 0) return;
+
     const currentIndex = playerQueue.findIndex(t => t.id === currentTrack.id);
 
     if (currentIndex !== -1 && currentIndex < playerQueue.length - 1) {
       setCurrentTrack(playerQueue[currentIndex + 1]);
-    } else {
+    } 
+    else {
       setRadioMode(true);
       const seedTrack = currentTrack;
       const variations = [
@@ -131,6 +138,7 @@ export default function App() {
             setCurrentTrack(playerQueue[0]);
         }
       } catch (error) {
+        console.error(error);
         setCurrentTrack(playerQueue[0]);
       }
     }
@@ -239,7 +247,9 @@ export default function App() {
           onExit={() => setIsCarMode(false)}
           onSearch={handleGlobalSearch}
           playlist={searchTracks}
+          userPlaylists={userPlaylists}
           onSelectTrack={(t: Track) => playTrack(t, searchTracks)}
+          onPlayPlaylist={(tracks: Track[]) => playTrack(tracks[0], tracks)}
           isSearching={isSearching}
         />
       ) : (
